@@ -1,0 +1,146 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+.light,
+:root {
+    color-scheme: light;
+    --background: var(--color-gray-100);
+    --text: var(--color-gray-700);
+}
+
+.dark {
+    color-scheme: dark;
+    --background: var(--color-gray-900);
+    --text: var(--color-gray-300);
+}
+
+@font-face {
+    font-family: 'Instrument Sans';
+    src: url('./fonts/InstrumentSans-Regular.woff2') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@theme inline {
+    --font-sans:
+        Instrument Sans, ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+}
+
+@utility text-body {
+    color: var(--text);
+}
+
+@utility bg-body {
+    background-color: var(--background);
+}
+
+@layer base {
+    body {
+        @apply bg-body text-body text-[15px] md:text-base;
+    }
+    *[data-scroll-lock='true'] {
+        overflow: hidden;
+        padding: 0;
+        padding: 0;
+        position: relative;
+        overscroll-behavior: contain;
+        min-height: 100vh;
+    }
+
+    body #app #auth-layout {
+        @apply relative flex min-h-screen flex-col items-center justify-center max-[28rem]:px-3;
+    }
+    body #app {
+        min-height: 100%;
+    }
+    body > #app main #page-content {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        min-height: 100vh;
+    }
+    @media (width >= 40rem) {
+        .smart-scroll {
+            &::-webkit-scrollbar {
+                @apply w-2;
+            }
+            &::-webkit-scrollbar-track {
+                @apply rounded-md bg-slate-200;
+            }
+
+            &::-webkit-scrollbar-thumb {
+                @apply rounded-md border-0 border-slate-200 bg-slate-400;
+            }
+
+            &::-webkit-scrollbar-thumb:hover {
+                @apply bg-slate-500;
+            }
+
+            @variant dark {
+                &::-webkit-scrollbar-track {
+                    @apply rounded-md bg-slate-800;
+                }
+
+                &::-webkit-scrollbar-thumb {
+                    @apply rounded-md border-0 border-slate-200 bg-slate-700 hover:bg-slate-400;
+                }
+            }
+        }
+    }
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover,
+    input:-webkit-autofill:focus,
+    input:-webkit-autofill:active,
+    textarea:-webkit-autofill,
+    textarea:-webkit-autofill:hover,
+    textarea:-webkit-autofill:focus,
+    textarea:-webkit-autofill:active {
+        -webkit-box-shadow: 0 0 0px 1000px var(--background) inset !important;
+        -webkit-text-fill-color: var(--text) !important;
+        transition: background-color 5000s ease-in-out 0s;
+    }
+
+    /* Hides the eye icon (password reveal) */
+    input[type='password']::-ms-reveal {
+        display: none;
+    }
+
+    /* Hides the 'X' button (clear button) */
+    input[type='password']::-ms-clear {
+        display: none;
+    }
+
+    .fade-enter-active,
+    .fade-leave-active {
+        transition:
+            opacity 0.2s ease,
+            transform 0.2s ease;
+        transform: translateY(0);
+    }
+
+    .fade-enter-from,
+    .fade-leave-to {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+
+    .slide-in-enter-active,
+    .slide-in-leave-active {
+        transition:
+            opacity 0.3s ease,
+            transform 0.2s ease;
+        transform: translateX(0);
+    }
+
+    .slide-in-enter-from,
+    .slide-in-leave-to {
+        opacity: 0;
+        transform: translateX(5px);
+    }
+}
