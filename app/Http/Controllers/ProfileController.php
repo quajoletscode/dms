@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\UpdateProfileRequest;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Response;
 
 class ProfileController extends Controller
 {
     /**
      * Display the user's profile.
      */
-    public function show()
+    public function show(): Response
     {
         $user = request()->user();
 
@@ -25,7 +26,7 @@ class ProfileController extends Controller
     /**
      * Update the authenticated user's profile.
      */
-    public function update(Request $request)
+    public function update(Request $request): RedirectResponse
     {
         // $user = $request->user();
         // $validated = $request->validated();

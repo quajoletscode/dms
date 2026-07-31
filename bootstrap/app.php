@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->group(base_path('routes/auth.php'));
         }
     )
+    ->withCommands([
+        app_path('Modules/Warehouse/Console'),
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
             HandleInertiaRequests::class,

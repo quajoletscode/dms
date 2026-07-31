@@ -4,7 +4,6 @@
       import type { HTMLAttributes } from 'vue';
       import TextInput from '@/components/ui/inputs/TextInput.vue';
       import Time from '@/components/Time.vue';
-      import { usePermissions } from '@/composables/usePermission';
       import { roleMenus } from '../../../types/navigation';
       import type { NavItem } from '../../../types/navigation';
       import NavLinkGroup from '@/components/NavLinkGroup.vue';
@@ -13,7 +12,6 @@ import { SearchIcon } from '@lucide/vue';
 
       const page = usePage();
 
-      const { userRole, isAdmin } = usePermissions();
       const searchKey = ref('');
 
       const items = computed<NavItem[]>(() => {

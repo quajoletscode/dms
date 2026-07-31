@@ -4,41 +4,34 @@ import { computed } from 'vue';
 export function usePermissions() {
     const page = usePage();
 
-    const userRole = computed(() => page.props.auth.user?.role?.name ?? '');
+    const userRole = computed(() => page.props.auth.role ?? '');
 
-    const isAdmin = computed(() => userRole.value === 'admin');
-    const isGeneralManager = computed(
-        () => userRole.value === 'general_manager',
-    );
-    const isStationManager = computed(
-        () => userRole.value === 'station_manager',
-    );
+    const isSuperAdmin = computed(() => userRole.value === 'super_admin');
+    const isWarehouseManager = computed(() => userRole.value === 'warehouse_manager');
+    const isDsr = computed(() => userRole.value === 'dsr');
     const isAccountant = computed(() => userRole.value === 'accountant');
-    // const isPumpAttendant = computed(() => userRole.value === 'attendant');
+    const isWholesaleCashier = computed(() => userRole.value === 'wholesale_cashier');
 
-    const permissions = computed(() => page.props.auth.user?.permissions ?? []);
+    const permissions = computed(() => page.props.auth.permissions ?? []);
 
-    // Named after Blade's @can for developer familiarity — but this checks the new
-    // permission-slug system, not a Policy. Admin bypasses since its grants aren't
-    // materialized as rows (see User::hasPermission()).
+    // Named after Blade's @can for developer familiarity — but this checks the
+    // spatie/laravel-permission slug system, not a Policy directly. Super Admin
+    // bypasses since its grants aren't necessarily materialized as rows.
     function can(slug: string): boolean {
-        return isAdmin.value || permissions.value.includes(slug);
+        return isSuperAdmin.value || permissions.value.includes(slug);
     }
 
     function canAny(...slugs: string[]): boolean {
-        return (
-            isAdmin.value ||
-            slugs.some((slug) => permissions.value.includes(slug))
-        );
+        return isSuperAdmin.value || slugs.some((slug) => permissions.value.includes(slug));
     }
 
     return {
         userRole,
-        isAdmin,
-        isGeneralManager,
-        isStationManager,
+        isSuperAdmin,
+        isWarehouseManager,
+        isDsr,
         isAccountant,
-        // isPumpAttendant,
+        isWholesaleCashier,
         can,
         canAny,
     };
