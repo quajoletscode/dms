@@ -31,3 +31,5 @@ export interface SelectOption {
     label: string;
     value: string | number | any;
 }
+
+export type ColumnDef = string | { label: string; key: string };

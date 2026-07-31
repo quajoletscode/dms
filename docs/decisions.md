@@ -79,3 +79,30 @@ The build plan listed `warehouse_user` and full FK constraints on `stock_ledger`
 ## ADR-14 — PHPStan raised to level 8 immediately
 
 Bumped from the repo's starting level 7 straight to level 8 (per the build's engineering standard) in Phase 0 rather than deferring, and every resulting error fixed at the source: explicit return types on the two pre-existing stub controllers, `@return X<Y, $this>` generics on every Eloquent relation method, `numeric-string`-typed BCMath call sites in `Quantity`, and rewriting the trigger migration to use literal (non-interpolated) SQL strings instead of a `foreach` over table names. No `@phpstan-ignore` or baseline entries were used.
+
+---
+
+# Phase 1 — Master Data
+
+## ADR-15 — Deferred FK backfill lands, with a SQLite side effect
+
+**Context.** ADR-13 deferred `warehouse_user` and the `stock_ledger`/`stock_balances` → `products`/`batches` foreign keys to Phase 1, once those tables would exist.
+**What happened.** Both landed as planned (`2026_07_31_070001_create_warehouse_user_table`, `2026_07_31_070012_add_product_batch_foreign_keys_to_stock_tables`). The FK-add migration broke `StockLedgerImmutabilityTest`'s DB-layer assertions: SQLite has no `ALTER TABLE ADD CONSTRAINT`, so Laravel adds a foreign key to an *existing* SQLite table by rebuilding it (rename → recreate → copy → drop) — which silently drops any triggers attached to that table. The Phase 0 append-only triggers on `stock_ledger` (from migration `060508`) were casualties; `journal_lines` was untouched by this migration so its triggers survived.
+**Fix.** `2026_07_31_070013_recreate_stock_ledger_immutability_triggers` re-creates both triggers, `DROP TRIGGER IF EXISTS` first so it's idempotent on MySQL too (where the FK add doesn't rebuild the table and the triggers never actually vanished).
+**Takeaway for later phases.** Any future migration that adds a constraint to an existing table via `Schema::table()` on SQLite should be checked for the same trigger-loss side effect.
+
+## ADR-16 — Eloquent `create()` doesn't reflect DB column defaults
+
+`RegisterWarehouse`, `RegisterVan`, `CreateProduct`, `CreateSupplier`, `CreateCustomer` all write to a column with a migration-level `->default(true)` (`is_active`). Eloquent's `create()` returns the in-memory model with only the attributes you explicitly set — it does not re-fetch DB-applied defaults — so `$warehouse->is_active` was `null` on the returned instance even though the stored row had `1`. Fixed by setting `is_active => true` explicitly in every Action that creates one of these models, rather than relying on the DB default. Caught by `WarehouseManagementTest`'s `'a warehouse can be registered'` test.
+
+## ADR-17 — Added a minimal login flow
+
+**Context.** `routes/auth.php` was empty and no route in `routes/web.php` had `auth` middleware — there was no way for any user to authenticate, at all. This wasn't specific to Phase 1, but it blocks meaningfully verifying anything built so far (RBAC, warehouse scoping) outside of Pest's `actingAs()`.
+**Decision.** Added `App\Http\Controllers\Auth\LoginController` (session-based `Auth::attempt()`, rate-limited 5/min on the POST route) and `resources/js/pages/Auth/Login.vue`, and wrapped `dashboard`/`profile`/the five new resource route groups in `auth` middleware. No registration or password-reset flow — the spec has admins provisioning users, not self-registration, so those aren't needed yet.
+
+## ADR-18 — Frontend: DataTable made usable, deliberately without its pagination machinery
+
+- Added the missing `ColumnDef` type export to `resources/js/types/index.ts` (`string | {label, key}`) — `BaseTable.vue`/`DataTable.vue` already expected it; without it, any new page importing it would carry a genuinely new (not pre-existing) type error.
+- Phase 1 list pages use `BaseTable` directly (static, unpaginated arrays) rather than the full `DataTable` wrapper, which pulls in `useSort`/`SimplePagination` — both hit the pre-existing `Request` type collision documented in ADR-11 (a same-named global DOM type shadowing the custom `@/types` one). Sidestepping it avoids inheriting that bug into working new pages. Real search/sort/pagination is deferred to the Phase 8 hardening pass; current master-data volumes don't need it yet.
+- Wired the previously-dead `message` flash-toast prop: `HandleInertiaRequests::share()` now sends `success`/`error`/`warning`/`info` from the session, which `MainLayout.vue`/`AuthLayout.vue` were already watching for but never received. Phase 1 controllers rely on it (`->with('success', ...)` on every redirect).
+- `SideNav.vue`'s nav list was hardcoded to `roleMenus.default()` with an unused `permissions` variable — actually wired it to `usePermissions().can()` so items disappear for roles lacking the permission, and populated `navigation.ts` with the Warehouses/Vans/Products/Suppliers/Customers menu.

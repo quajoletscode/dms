@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 final class RegisterVan
 {
     /**
-     * @param  array{code: string, warehouse_id: int, vehicle_no?: string|null, dsr_user_id?: int|null}  $data
+     * @param  array<string, mixed>  $data  code, warehouse_id, vehicle_no?, dsr_user_id? — validated by StoreVanRequest
      */
     public function execute(array $data): VanStorage
     {

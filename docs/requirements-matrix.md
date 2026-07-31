@@ -21,22 +21,23 @@ Status legend: **DONE** (implemented + test passing) · **PARTIAL** (infrastruct
 
 | ID | Requirement | Module | Status | Test(s) |
 |---|---|---|---|---|
-| — | RBAC with granular permissions | Identity | PARTIAL | mechanism in place (ADR-2); real permission strings + policies land in Phase 1 |
-| — | Warehouse-level / van-level scoping | Identity | PENDING | Phase 1 (`WarehouseScope`, `VanScope`) |
+| — | RBAC with granular permissions | Identity | DONE | `RolePermissionSeeder`; `tests/Feature/MasterData/RolePermissionScopingTest.php` |
+| — | Warehouse-level / van-level scoping | Identity | DONE | `WarehouseScope`/`VanScope`; `WarehouseManagementTest.php` (incl. direct-ID probe), `RolePermissionScopingTest.php` |
 | — | Approval separation (creator ≠ approver) | Identity | PENDING | Phase 2 (`PurchaseOrder`), Phase 5 (`Loadout`), Phase 6 (journals) |
 | — | Full audit trail | Identity | DONE | `tests/Feature/Foundation/AuditLogTest.php` |
+| — | Minimal login/logout (session-based) | Identity | DONE | `tests/Feature/Auth/LoginTest.php` |
 
 ## 4.1 Warehouse Management Module
 
 | ID | Requirement | Status | Test(s) |
 |---|---|---|---|
-| WH-01 | Unlimited warehouses, code/name/location/manager | PENDING (Phase 1) | — |
-| WH-02 | Warehouse ↔ van storages (1 van = 1 DSR + 1 parent warehouse) | PENDING (Phase 1) | — |
-| WH-03 | Central product catalogue incl. unit conversions | PENDING (Phase 1) | — |
-| WH-04 | Batch/lot + expiry tracking, FEFO issuing | PENDING (Phase 1 entity, Phase 3 FEFO logic) | — |
-| WH-05 | Immutable stock ledger entry per movement | PARTIAL | ledger infra: `StockLedgerImmutabilityTest.php`; real movements start Phase 2 |
+| WH-01 | Unlimited warehouses, code/name/location/manager | DONE | `WarehouseManagementTest.php`; CRUD UI at `/warehouses` |
+| WH-02 | Warehouse ↔ van storages (1 van = 1 DSR + 1 parent warehouse) | DONE | `VanRegistrationTest.php`, `VanReassignmentTest.php`; CRUD UI at `/vans` |
+| WH-03 | Central product catalogue incl. unit conversions | DONE | `ProductUnitConversionTest.php`; CRUD UI at `/products` (category is optional, no dedicated Category CRUD UI yet) |
+| WH-04 | Batch/lot + expiry tracking, FEFO issuing | PARTIAL | entity + past-expiry guard: `BatchExpiryTest.php`; FEFO *issuing* logic is Phase 3 |
+| WH-05 | Immutable stock ledger entry per movement | PARTIAL | ledger infra + FK integrity to real products: `StockLedgerImmutabilityTest.php`; real movements start Phase 2 |
 | WH-06 | Reorder-level and expiry alerts | PENDING (Phase 8) | — |
-| PO-01 | Supplier master + ledger | PENDING (Phase 1) | — |
+| PO-01 | Supplier master + ledger | DONE | CRUD UI at `/suppliers`; ledger/statement reporting is Phase 6 |
 | PO-02 | Purchase Orders per warehouse | PENDING (Phase 2) | — |
 | PO-03 | PO status lifecycle | PENDING (Phase 2) | — |
 | PO-04 | PO printable/emailable PDF | PENDING (Phase 8) | — |
@@ -57,9 +58,9 @@ Status legend: **DONE** (implemented + test passing) · **PARTIAL** (infrastruct
 
 | ID | Requirement | Status | Test(s) |
 |---|---|---|---|
-| VAN-01 | Van storage registration | PENDING (Phase 1) | — |
-| VAN-02 | Routes/beats | PENDING (Phase 1, light) | — |
-| VAN-03 | Retailer/outlet master | PENDING (Phase 1) | — |
+| VAN-01 | Van storage registration | DONE | `VanRegistrationTest.php`; CRUD UI at `/vans` |
+| VAN-02 | Routes/beats | PARTIAL | `Route`/`RouteStop` tables + models exist; no Action/UI yet (no CRUD needed until Phase 7 route-coverage reporting) |
+| VAN-03 | Retailer/outlet master | PARTIAL | modeled as `Customer` (type=retailer) per spec §6.1 — code/name/credit_limit/price_category/rims_tenant_code all present; GPS location field not yet added |
 | DSR-01..10 | DSR mobile app functions (offline, sync, visits, targets) | PENDING (Phase 7) | — |
 
 ## 4.3 Financial Management Module

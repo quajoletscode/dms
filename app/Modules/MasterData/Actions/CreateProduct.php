@@ -8,7 +8,7 @@ use App\Support\Money;
 final class CreateProduct
 {
     /**
-     * @param  array{sku: string, name: string, unit_id: int, barcode?: string|null, category_id?: int|null, cost_price?: string|int|float, wholesale_price?: string|int|float, retail_price?: string|int|float, van_price?: string|int|float, tax_rate?: string|int|float, reorder_level?: string|int|float, track_expiry?: bool}  $data
+     * @param  array<string, mixed>  $data  sku, name, unit_id, barcode?, category_id?, cost_price?, wholesale_price?, retail_price?, van_price?, tax_rate?, reorder_level?, track_expiry? — validated by StoreProductRequest
      */
     public function execute(array $data): Product
     {
@@ -18,10 +18,10 @@ final class CreateProduct
             'name' => $data['name'],
             'category_id' => $data['category_id'] ?? null,
             'unit_id' => $data['unit_id'],
-            'cost_price' => Money::fromMajor($data['cost_price'] ?? 0)->minorUnits,
-            'wholesale_price' => Money::fromMajor($data['wholesale_price'] ?? 0)->minorUnits,
-            'retail_price' => Money::fromMajor($data['retail_price'] ?? 0)->minorUnits,
-            'van_price' => Money::fromMajor($data['van_price'] ?? 0)->minorUnits,
+            'cost_price' => Money::fromMajor((string) ($data['cost_price'] ?? 0))->minorUnits,
+            'wholesale_price' => Money::fromMajor((string) ($data['wholesale_price'] ?? 0))->minorUnits,
+            'retail_price' => Money::fromMajor((string) ($data['retail_price'] ?? 0))->minorUnits,
+            'van_price' => Money::fromMajor((string) ($data['van_price'] ?? 0))->minorUnits,
             'tax_rate' => $data['tax_rate'] ?? 0,
             'reorder_level' => $data['reorder_level'] ?? 0,
             'track_expiry' => $data['track_expiry'] ?? false,

@@ -7,7 +7,7 @@ use App\Modules\Warehouse\Models\Warehouse;
 final class RegisterWarehouse
 {
     /**
-     * @param  array{code: string, name: string, location?: string|null, manager_id?: int|null}  $data
+     * @param  array<string, mixed>  $data  code, name, location?, manager_id? — validated by StoreWarehouseRequest
      */
     public function execute(array $data): Warehouse
     {

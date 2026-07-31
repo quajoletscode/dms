@@ -4,6 +4,7 @@
       import type { HTMLAttributes } from 'vue';
       import TextInput from '@/components/ui/inputs/TextInput.vue';
       import Time from '@/components/Time.vue';
+      import { usePermissions } from '@/composables/usePermission';
       import { roleMenus } from '../../../types/navigation';
       import type { NavItem } from '../../../types/navigation';
       import NavLinkGroup from '@/components/NavLinkGroup.vue';
@@ -12,12 +13,18 @@ import { SearchIcon } from '@lucide/vue';
 
       const page = usePage();
 
+      const { can } = usePermissions();
+
       const searchKey = ref('');
 
       const items = computed<NavItem[]>(() => {
-            const permissions = page.props.auth.user?.permissions ?? [];
-
-            return roleMenus.default();
+            return roleMenus
+                  .default()
+                  .map((group) => ({
+                        ...group,
+                        items: group.items.filter((item) => !item.permission || can(item.permission)),
+                  }))
+                  .filter((group) => group.items.length > 0);
       });
 
       const filteredItems = computed(() => {

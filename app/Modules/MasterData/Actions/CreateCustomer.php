@@ -8,7 +8,7 @@ use App\Support\Money;
 final class CreateCustomer
 {
     /**
-     * @param  array{code: string, name: string, type?: string, credit_limit?: string|int|float, price_category?: string|null, coa_account_id?: int|null, rims_tenant_code?: string|null}  $data
+     * @param  array<string, mixed>  $data  code, name, type?, credit_limit?, price_category?, coa_account_id?, rims_tenant_code? — validated by StoreCustomerRequest
      */
     public function execute(array $data): Customer
     {
@@ -16,7 +16,7 @@ final class CreateCustomer
             'code' => $data['code'],
             'name' => $data['name'],
             'type' => $data['type'] ?? 'wholesale',
-            'credit_limit' => Money::fromMajor($data['credit_limit'] ?? 0)->minorUnits,
+            'credit_limit' => Money::fromMajor((string) ($data['credit_limit'] ?? 0))->minorUnits,
             'price_category' => $data['price_category'] ?? null,
             'coa_account_id' => $data['coa_account_id'] ?? null,
             'rims_tenant_code' => $data['rims_tenant_code'] ?? null,

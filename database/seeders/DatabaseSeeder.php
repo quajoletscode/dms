@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Modules\MasterData\Models\Unit;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -25,5 +26,8 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $admin->assignRole('super_admin');
+
+        $piece = Unit::query()->create(['name' => 'Piece', 'symbol' => 'pc']);
+        Unit::query()->create(['name' => 'Carton', 'symbol' => 'ctn', 'base_unit_id' => $piece->id, 'conversion_factor' => 12]);
     }
 }

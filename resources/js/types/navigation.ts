@@ -1,7 +1,12 @@
 import type { InertiaLinkProps } from '@inertiajs/vue3';
 import type { LucideIcon } from '@lucide/vue';
-import { LayoutGridIcon } from '@lucide/vue';
+import { LayoutGridIcon, PackageIcon, TruckIcon, UsersIcon, WarehouseIcon } from '@lucide/vue';
 import { dashboard } from '@/routes';
+import { index as customersIndex } from '@/routes/customers';
+import { index as productsIndex } from '@/routes/products';
+import { index as suppliersIndex } from '@/routes/suppliers';
+import { index as vansIndex } from '@/routes/vans';
+import { index as warehousesIndex } from '@/routes/warehouses';
 
 export interface NavItem {
     group: string;
@@ -18,44 +23,29 @@ export interface NavItem {
     }[];
 }
 
-// Base menu items - reusable across roles
-const baseItems = {
-    dashboard: (
-        to: NonNullable<InertiaLinkProps['href']>,
-        icon: LucideIcon,
-    ) => ({
-        name: 'dashboard',
-        to,
-        icon,
-    }),
-    accountSettings: (
-        to: NonNullable<InertiaLinkProps['href']>,
-        icon: LucideIcon,
-    ) => ({
-        name: 'account settings',
-        to,
-        icon,
-    }),
-    // systemConfig: (to: NonNullable<InertiaLinkProps['href']>, icon: LucideIcon) => ({
-    //     name: 'system configuration',
-    //     to,
-    //     icon,
-    // }),
-};
-
-// Role-specific menus
+// Role-specific menus. Items are further filtered by permission at render
+// time in SideNav.vue, so a single "default" menu covers every role — each
+// item just disappears for users who lack its permission slug.
 export const roleMenus = {
-    admin: (): NavItem[] => [
-        {
-            group: 'overview',
-            items: [baseItems.dashboard(dashboard().url, LayoutGridIcon)],
-        },
-    ],
-
     default: (): NavItem[] => [
         {
             group: 'overview',
-            items: [baseItems.dashboard(dashboard().url, LayoutGridIcon)],
+            items: [{ name: 'dashboard', to: dashboard().url, icon: LayoutGridIcon }],
         },
-    ], //pump attendant and any other roles not explicitly defined
+        {
+            group: 'inventory',
+            items: [
+                { name: 'warehouses', to: warehousesIndex().url, icon: WarehouseIcon, permission: 'warehouse.view' },
+                { name: 'vans', to: vansIndex().url, icon: TruckIcon, permission: 'van.view' },
+                { name: 'products', to: productsIndex().url, icon: PackageIcon, permission: 'product.view' },
+            ],
+        },
+        {
+            group: 'partners',
+            items: [
+                { name: 'suppliers', to: suppliersIndex().url, icon: UsersIcon, permission: 'supplier.view' },
+                { name: 'customers', to: customersIndex().url, icon: UsersIcon, permission: 'customer.view' },
+            ],
+        },
+    ],
 };
