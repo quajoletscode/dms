@@ -1,9 +1,10 @@
 <script lang="ts" setup>
 import { Link } from '@inertiajs/vue3';
-import { PlusIcon, SquarePenIcon } from '@lucide/vue';
+import { EyeIcon, PlusIcon, SquarePenIcon } from '@lucide/vue';
 import BaseTable from '@/components/DataTable/BaseTable.vue';
+import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
-import { create, edit } from '@/routes/suppliers';
+import { create, edit, show } from '@/routes/suppliers';
 import type { ColumnDef } from '@/types';
 
 interface Supplier {
@@ -42,17 +43,17 @@ const thead: ColumnDef[] = ['Code', 'Name', 'Contact', 'Status', 'Actions'];
                 <td class="px-3 py-2">{{ supplier.name }}</td>
                 <td class="px-3 py-2 text-slate-500 dark:text-slate-400">{{ supplier.contact ?? '—' }}</td>
                 <td class="px-3 py-2">
-                    <span
-                        class="rounded-full px-2 py-0.5 text-xs font-medium"
-                        :class="supplier.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'"
-                    >
-                        {{ supplier.is_active ? 'Active' : 'Inactive' }}
-                    </span>
+                    <Badge :variant="supplier.is_active ? 'success' : 'neutral'">{{ supplier.is_active ? 'Active' : 'Inactive' }}</Badge>
                 </td>
                 <td class="px-3 py-2">
-                    <Link :href="edit(supplier.id).url" title="Edit supplier">
-                        <SquarePenIcon :size="18" class="text-slate-400 hover:text-primary-light" />
-                    </Link>
+                    <div class="flex items-center gap-3">
+                        <Link :href="show(supplier.id).url" title="View supplier">
+                            <EyeIcon :size="18" class="text-slate-400 hover:text-primary-light" />
+                        </Link>
+                        <Link :href="edit(supplier.id).url" title="Edit supplier">
+                            <SquarePenIcon :size="18" class="text-slate-400 hover:text-primary-light" />
+                        </Link>
+                    </div>
                 </td>
             </tr>
 

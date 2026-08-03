@@ -50,6 +50,14 @@ final class Money implements Stringable
         return new self((int) round($this->minorUnits * (float) $factor), $this->currency);
     }
 
+    /**
+     * @param  int|float|string  $rate  e.g. '15.00' for 15%
+     */
+    public function percentage(int|float|string $rate): self
+    {
+        return $this->multiply(((float) $rate) / 100);
+    }
+
     public function negate(): self
     {
         return new self(-$this->minorUnits, $this->currency);

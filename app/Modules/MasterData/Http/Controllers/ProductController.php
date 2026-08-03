@@ -10,6 +10,7 @@ use App\Modules\MasterData\Http\Requests\UpdateProductRequest;
 use App\Modules\MasterData\Models\Category;
 use App\Modules\MasterData\Models\Product;
 use App\Modules\MasterData\Models\Unit;
+use App\Support\AdjacentRecordResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -23,6 +24,27 @@ class ProductController extends Controller
 
         return Inertia::render('products/Index', [
             'products' => Product::query()->with(['category', 'unit'])->orderBy('name')->get(),
+        ]);
+    }
+
+    public function show(Product $product, AdjacentRecordResolver $adjacent): Response
+    {
+        Gate::authorize('view', $product);
+
+        $product->load(['category', 'unit']);
+
+        return Inertia::render('products/Show', [
+            'product' => [
+                ...$product->only(['id', 'sku', 'barcode', 'name', 'tax_rate', 'track_expiry', 'is_active', 'created_at', 'updated_at']),
+                'category' => $product->category,
+                'unit' => $product->unit,
+                'cost_price' => $product->cost_price->toMajor(),
+                'wholesale_price' => $product->wholesale_price->toMajor(),
+                'retail_price' => $product->retail_price->toMajor(),
+                'van_price' => $product->van_price->toMajor(),
+                'reorder_level' => (string) $product->reorder_level,
+            ],
+            ...$adjacent->resolve(Product::query(), $product, 'name'),
         ]);
     }
 

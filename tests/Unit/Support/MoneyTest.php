@@ -25,6 +25,11 @@ test('multiply scales the amount', function () {
     expect(Money::fromMajor('2.50')->multiply(3)->toMajor())->toBe('7.50');
 });
 
+test('percentage computes a rate on the amount', function () {
+    expect(Money::fromMajor('200.00')->percentage('15.00')->toMajor())->toBe('30.00')
+        ->and(Money::fromMajor('10.00')->percentage(0)->isZero())->toBeTrue();
+});
+
 test('cannot mix currencies', function () {
     $ghs = Money::fromMajor('10.00', 'GHS');
     $usd = Money::fromMajor('10.00', 'USD');

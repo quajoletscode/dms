@@ -7,6 +7,7 @@ use App\Modules\MasterData\Actions\CreateSupplier;
 use App\Modules\MasterData\Http\Requests\StoreSupplierRequest;
 use App\Modules\MasterData\Http\Requests\UpdateSupplierRequest;
 use App\Modules\MasterData\Models\Supplier;
+use App\Support\AdjacentRecordResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -20,6 +21,19 @@ class SupplierController extends Controller
 
         return Inertia::render('suppliers/Index', [
             'suppliers' => Supplier::query()->orderBy('name')->get(),
+        ]);
+    }
+
+    public function show(Supplier $supplier, AdjacentRecordResolver $adjacent): Response
+    {
+        Gate::authorize('view', $supplier);
+
+        return Inertia::render('suppliers/Show', [
+            'supplier' => [
+                ...$supplier->only(['id', 'code', 'name', 'contact', 'payment_terms', 'is_active', 'created_at', 'updated_at']),
+                'opening_balance' => $supplier->opening_balance->toMajor(),
+            ],
+            ...$adjacent->resolve(Supplier::query(), $supplier, 'name'),
         ]);
     }
 

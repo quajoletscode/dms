@@ -23,7 +23,7 @@ Status legend: **DONE** (implemented + test passing) · **PARTIAL** (infrastruct
 |---|---|---|---|---|
 | — | RBAC with granular permissions | Identity | DONE | `RolePermissionSeeder`; `tests/Feature/MasterData/RolePermissionScopingTest.php` |
 | — | Warehouse-level / van-level scoping | Identity | DONE | `WarehouseScope`/`VanScope`; `WarehouseManagementTest.php` (incl. direct-ID probe), `RolePermissionScopingTest.php` |
-| — | Approval separation (creator ≠ approver) | Identity | PENDING | Phase 2 (`PurchaseOrder`), Phase 5 (`Loadout`), Phase 6 (journals) |
+| — | Approval separation (creator ≠ approver) | Identity | PARTIAL | `PurchaseOrder`: `PurchaseOrderLifecycleTest.php`; Phase 5 (`Loadout`), Phase 6 (journals) still pending |
 | — | Full audit trail | Identity | DONE | `tests/Feature/Foundation/AuditLogTest.php` |
 | — | Minimal login/logout (session-based) | Identity | DONE | `tests/Feature/Auth/LoginTest.php` |
 
@@ -35,16 +35,16 @@ Status legend: **DONE** (implemented + test passing) · **PARTIAL** (infrastruct
 | WH-02 | Warehouse ↔ van storages (1 van = 1 DSR + 1 parent warehouse) | DONE | `VanRegistrationTest.php`, `VanReassignmentTest.php`; CRUD UI at `/vans` |
 | WH-03 | Central product catalogue incl. unit conversions | DONE | `ProductUnitConversionTest.php`; CRUD UI at `/products` (category is optional, no dedicated Category CRUD UI yet) |
 | WH-04 | Batch/lot + expiry tracking, FEFO issuing | PARTIAL | entity + past-expiry guard: `BatchExpiryTest.php`; FEFO *issuing* logic is Phase 3 |
-| WH-05 | Immutable stock ledger entry per movement | PARTIAL | ledger infra + FK integrity to real products: `StockLedgerImmutabilityTest.php`; real movements start Phase 2 |
+| WH-05 | Immutable stock ledger entry per movement | DONE | GRN/purchase-return writes: `GrnPartialReceiptTest.php`, `PurchaseReturnTest.php`; all future stock-moving phases reuse `StockMover` |
 | WH-06 | Reorder-level and expiry alerts | PENDING (Phase 8) | — |
 | PO-01 | Supplier master + ledger | DONE | CRUD UI at `/suppliers`; ledger/statement reporting is Phase 6 |
-| PO-02 | Purchase Orders per warehouse | PENDING (Phase 2) | — |
-| PO-03 | PO status lifecycle | PENDING (Phase 2) | — |
+| PO-02 | Purchase Orders per warehouse | DONE | `PurchaseOrderLifecycleTest.php`; CRUD + submit/approve/cancel UI at `/purchase-orders` |
+| PO-03 | PO status lifecycle | DONE | `PurchaseOrderLifecycleTest.php` (dataset of every illegal transition), `PurchaseOrderCancelledAfterPartialGrnTest.php` |
 | PO-04 | PO printable/emailable PDF | PENDING (Phase 8) | — |
-| GRN-01 | GRN against PO or direct receipt | PENDING (Phase 2) | — |
-| GRN-02 | GRN captures batch/expiry/cost/invoice ref | PENDING (Phase 2) | — |
-| GRN-03 | GRN posts stock + Dr Inventory/Cr AP | PENDING (Phase 2) | — |
-| GRN-04 | PO vs GRN discrepancy flagging | PENDING (Phase 2) | — |
+| GRN-01 | GRN against PO or direct receipt | DONE | `CreateGrnFromPo`: `GrnPartialReceiptTest.php`; `CreateDirectGrn` (permission-gated): `DirectGrnTest.php` |
+| GRN-02 | GRN captures batch/expiry/cost/invoice ref | DONE | `GrnBatchExpiryTest.php` |
+| GRN-03 | GRN posts stock + Dr Inventory/Cr AP | DONE | `GrnPostsBalancedJournalTest.php` |
+| GRN-04 | PO vs GRN discrepancy flagging | PARTIAL | over-receipt is a hard block (permission-gated override), not just a flag: `GrnOverReceiptTest.php`; a discrepancy *report* is Phase 8 |
 | SO-01 | Sales Order lifecycle | PENDING (Phase 3) | — |
 | SO-02 | Proforma Invoice (non-posting) | PENDING (Phase 3) | — |
 | SO-03 | Convert to Invoice posts stock + AR/Revenue/COGS | PENDING (Phase 3) | — |
@@ -53,6 +53,7 @@ Status legend: **DONE** (implemented + test passing) · **PARTIAL** (infrastruct
 | POS-01..05 | Warehouse POS (barcode, payments, till, price control) | PENDING (Phase 4) | — |
 | LO-01..04 | Loadout request lifecycle | PENDING (Phase 5) | — |
 | LI-01..03 | Loadin request + van settlement identity | PENDING (Phase 5) | — |
+| — | Purchase Returns (spec §4.1.9 nav menu; no formal ID) | DONE | `PostPurchaseReturn`: `PurchaseReturnTest.php` |
 
 ## 4.2 DSR / Field Assist Management Module
 
@@ -67,10 +68,10 @@ Status legend: **DONE** (implemented + test passing) · **PARTIAL** (infrastruct
 
 | ID | Requirement | Status | Test(s) |
 |---|---|---|---|
-| FIN-01 | Hierarchical Chart of Accounts | PARTIAL | table + model exist; seeded standard template is Phase 1/6 |
-| FIN-02 | Every financial event posts a balanced journal automatically; manual journals with approval | PARTIAL | generic engine: `PostingEngineBalancesTest.php`; manual-journal UI + approval threshold is Phase 6 |
+| FIN-01 | Hierarchical Chart of Accounts | PARTIAL | table + model exist; minimal seed (Inventory, AP) via `ChartOfAccountSeeder`; full standard template is Phase 6 |
+| FIN-02 | Every financial event posts a balanced journal automatically; manual journals with approval | PARTIAL | real business events now post automatically (`GrnPostingRule`, `PurchaseReturnPostingRule`): `GrnPostsBalancedJournalTest.php`; manual-journal UI + approval threshold is Phase 6 |
 | FIN-03 | Posted journals immutable; corrections via reversal only | DONE | `tests/Feature/Foundation/JournalImmutabilityTest.php` (reversal *documents* land Phase 6) |
-| FIN-04 | AR/AP sub-ledgers reconcile to control accounts | PENDING (Phase 2 AP, Phase 3 AR, Phase 6 reconciliation) | — |
+| FIN-04 | AR/AP sub-ledgers reconcile to control accounts | PARTIAL | AP half done: `GrnPostsBalancedJournalTest.php` ("control account reconciles to supplier sub-ledger" test); AR is Phase 3, formal reconciliation report is Phase 6 |
 | FIN-05 | Closeable fiscal periods; posting blocked when closed | PARTIAL | table exists; enforcement is Phase 6 |
 | BNK-01..06 | Banks, deposits, withdrawals, transfers, reconciliation, DSR cash chain | PENDING (Phase 6) | — |
 

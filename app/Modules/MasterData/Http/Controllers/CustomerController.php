@@ -7,6 +7,7 @@ use App\Modules\MasterData\Actions\CreateCustomer;
 use App\Modules\MasterData\Http\Requests\StoreCustomerRequest;
 use App\Modules\MasterData\Http\Requests\UpdateCustomerRequest;
 use App\Modules\MasterData\Models\Customer;
+use App\Support\AdjacentRecordResolver;
 use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
@@ -21,6 +22,19 @@ class CustomerController extends Controller
 
         return Inertia::render('customers/Index', [
             'customers' => Customer::query()->orderBy('name')->get(),
+        ]);
+    }
+
+    public function show(Customer $customer, AdjacentRecordResolver $adjacent): Response
+    {
+        Gate::authorize('view', $customer);
+
+        return Inertia::render('customers/Show', [
+            'customer' => [
+                ...$customer->only(['id', 'code', 'name', 'type', 'price_category', 'is_active', 'created_at', 'updated_at']),
+                'credit_limit' => $customer->credit_limit->toMajor(),
+            ],
+            ...$adjacent->resolve(Customer::query(), $customer, 'name'),
         ]);
     }
 

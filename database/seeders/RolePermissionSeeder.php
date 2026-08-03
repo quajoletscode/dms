@@ -23,6 +23,7 @@ class RolePermissionSeeder extends Seeder
             'po.create', 'po.approve',
             'grn.create', 'grn.approve', 'grn.direct.create', 'grn.override',
             'sales.pos',
+            'so.create', 'invoice.create', 'invoice.payment.record', 'credit_note.create', 'sales.credit_override',
             'loadout.create', 'loadout.approve',
             'loadin.create', 'loadin.approve',
             'journal.post', 'bank.deposit', 'bank.withdraw', 'bank.transfer',
@@ -34,11 +35,17 @@ class RolePermissionSeeder extends Seeder
 
         $roles = [
             'super_admin' => $permissions,
+            // grn.direct.create, grn.override, and sales.credit_override are
+            // deliberately excluded: each is an elevated escape hatch (bypass-a-PO,
+            // exceed-a-PO-qty, exceed-a-credit-limit), granted per-user on top of
+            // this role, not a blanket default — see GrnOverReceiptTest /
+            // DirectGrnTest / ConvertToInvoiceCreditLimitTest.
             'warehouse_manager' => [
                 'warehouse.view', 'van.view', 'van.manage', 'product.view',
                 'supplier.view', 'customer.view',
-                'po.create', 'po.approve', 'grn.create', 'grn.approve', 'grn.direct.create', 'grn.override',
-                'sales.pos', 'loadout.approve', 'loadin.approve',
+                'po.create', 'po.approve', 'grn.create', 'grn.approve',
+                'sales.pos', 'so.create', 'invoice.create', 'invoice.payment.record', 'credit_note.create',
+                'loadout.approve', 'loadin.approve',
             ],
             'dsr' => [
                 'van.view', 'product.view', 'customer.view',

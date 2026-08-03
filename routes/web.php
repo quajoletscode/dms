@@ -6,6 +6,7 @@ use App\Modules\MasterData\Http\Controllers\CustomerController;
 use App\Modules\MasterData\Http\Controllers\ProductController;
 use App\Modules\MasterData\Http\Controllers\SupplierController;
 use App\Modules\Van\Http\Controllers\VanController;
+use App\Modules\Warehouse\Http\Controllers\PurchaseOrderController;
 use App\Modules\Warehouse\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
@@ -15,9 +16,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::singleton('/profile', ProfileController::class);
 
-    Route::resource('warehouses', WarehouseController::class)->except(['show', 'destroy']);
-    Route::resource('vans', VanController::class)->except(['show', 'destroy']);
-    Route::resource('products', ProductController::class)->except(['show', 'destroy']);
-    Route::resource('suppliers', SupplierController::class)->except(['show', 'destroy']);
-    Route::resource('customers', CustomerController::class)->except(['show', 'destroy']);
+    Route::resource('warehouses', WarehouseController::class)->except(['destroy']);
+    Route::resource('vans', VanController::class)->except(['destroy']);
+    Route::resource('products', ProductController::class)->except(['destroy']);
+    Route::resource('suppliers', SupplierController::class)->except(['destroy']);
+    Route::resource('customers', CustomerController::class)->except(['destroy']);
+
+    Route::resource('purchase-orders', PurchaseOrderController::class)->only(['index', 'create', 'store', 'show']);
+    Route::post('purchase-orders/{purchase_order}/submit', [PurchaseOrderController::class, 'submit'])->name('purchase-orders.submit');
+    Route::post('purchase-orders/{purchase_order}/approve', [PurchaseOrderController::class, 'approve'])->name('purchase-orders.approve');
+    Route::post('purchase-orders/{purchase_order}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
 });

@@ -11,6 +11,7 @@ use App\Modules\Van\Http\Requests\ReassignVanRequest;
 use App\Modules\Van\Http\Requests\StoreVanRequest;
 use App\Modules\Van\Models\VanStorage;
 use App\Modules\Warehouse\Models\Warehouse;
+use App\Support\AdjacentRecordResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -24,6 +25,22 @@ class VanController extends Controller
 
         return Inertia::render('vans/Index', [
             'vans' => VanStorage::query()->with(['warehouse', 'dsr'])->orderBy('code')->get(),
+        ]);
+    }
+
+    public function show(VanStorage $van, AdjacentRecordResolver $adjacent): Response
+    {
+        Gate::authorize('view', $van);
+
+        $van->load([
+            'warehouse',
+            'dsr',
+            'history' => fn ($query) => $query->with('dsr')->latest('assigned_at')->limit(10),
+        ]);
+
+        return Inertia::render('vans/Show', [
+            'van' => $van,
+            ...$adjacent->resolve(VanStorage::query(), $van, 'code'),
         ]);
     }
 

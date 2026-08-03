@@ -9,6 +9,7 @@ use App\Modules\Warehouse\Actions\RegisterWarehouse;
 use App\Modules\Warehouse\Http\Requests\StoreWarehouseRequest;
 use App\Modules\Warehouse\Http\Requests\UpdateWarehouseRequest;
 use App\Modules\Warehouse\Models\Warehouse;
+use App\Support\AdjacentRecordResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -22,6 +23,18 @@ class WarehouseController extends Controller
 
         return Inertia::render('warehouses/Index', [
             'warehouses' => Warehouse::query()->with('manager')->orderBy('name')->get(),
+        ]);
+    }
+
+    public function show(Warehouse $warehouse, AdjacentRecordResolver $adjacent): Response
+    {
+        Gate::authorize('view', $warehouse);
+
+        $warehouse->load(['manager', 'vans' => fn ($query) => $query->with('dsr')->orderBy('code')]);
+
+        return Inertia::render('warehouses/Show', [
+            'warehouse' => $warehouse,
+            ...$adjacent->resolve(Warehouse::query(), $warehouse, 'name'),
         ]);
     }
 

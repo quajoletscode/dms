@@ -1,9 +1,10 @@
 <script lang="ts" setup>
 import { Link } from '@inertiajs/vue3';
-import { PlusIcon, SquarePenIcon } from '@lucide/vue';
+import { EyeIcon, PlusIcon, SquarePenIcon } from '@lucide/vue';
 import BaseTable from '@/components/DataTable/BaseTable.vue';
+import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
-import { create, edit } from '@/routes/products';
+import { create, edit, show } from '@/routes/products';
 import type { ColumnDef } from '@/types';
 
 interface Product {
@@ -44,17 +45,17 @@ const thead: ColumnDef[] = ['SKU', 'Name', 'Category', 'Unit', 'Status', 'Action
                 <td class="px-3 py-2 text-slate-500 dark:text-slate-400">{{ product.category?.name ?? '—' }}</td>
                 <td class="px-3 py-2">{{ product.unit.name }}</td>
                 <td class="px-3 py-2">
-                    <span
-                        class="rounded-full px-2 py-0.5 text-xs font-medium"
-                        :class="product.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'"
-                    >
-                        {{ product.is_active ? 'Active' : 'Inactive' }}
-                    </span>
+                    <Badge :variant="product.is_active ? 'success' : 'neutral'">{{ product.is_active ? 'Active' : 'Inactive' }}</Badge>
                 </td>
                 <td class="px-3 py-2">
-                    <Link :href="edit(product.id).url" title="Edit product">
-                        <SquarePenIcon :size="18" class="text-slate-400 hover:text-primary-light" />
-                    </Link>
+                    <div class="flex items-center gap-3">
+                        <Link :href="show(product.id).url" title="View product">
+                            <EyeIcon :size="18" class="text-slate-400 hover:text-primary-light" />
+                        </Link>
+                        <Link :href="edit(product.id).url" title="Edit product">
+                            <SquarePenIcon :size="18" class="text-slate-400 hover:text-primary-light" />
+                        </Link>
+                    </div>
                 </td>
             </tr>
 

@@ -1,9 +1,10 @@
 import type { InertiaLinkProps } from '@inertiajs/vue3';
 import type { LucideIcon } from '@lucide/vue';
-import { LayoutGridIcon, PackageIcon, TruckIcon, UsersIcon, WarehouseIcon } from '@lucide/vue';
+import { ClipboardListIcon, LayoutGridIcon, PackageIcon, TruckIcon, UsersIcon, WarehouseIcon } from '@lucide/vue';
 import { dashboard } from '@/routes';
 import { index as customersIndex } from '@/routes/customers';
 import { index as productsIndex } from '@/routes/products';
+import { index as purchaseOrdersIndex } from '@/routes/purchase-orders';
 import { index as suppliersIndex } from '@/routes/suppliers';
 import { index as vansIndex } from '@/routes/vans';
 import { index as warehousesIndex } from '@/routes/warehouses';
@@ -46,6 +47,10 @@ export const roleMenus = {
                 { name: 'suppliers', to: suppliersIndex().url, icon: UsersIcon, permission: 'supplier.view' },
                 { name: 'customers', to: customersIndex().url, icon: UsersIcon, permission: 'customer.view' },
             ],
+        },
+        {
+            group: 'procurement',
+            items: [{ name: 'purchase orders', to: purchaseOrdersIndex().url, icon: ClipboardListIcon, permission: 'po.create' }],
         },
     ],
 };

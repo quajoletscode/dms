@@ -43,4 +43,30 @@ Living document, appended each phase. Phase 0 has no real business documents yet
 | Unauthenticated request to any protected route | Redirects to `/login` | `tests/Feature/Auth/LoginTest.php` |
 | Login with a wrong password | Rejected with a validation error on `email`, user stays a guest | same |
 
-Business-workflow edge cases (over-receipt, FEFO issuing, credit limits, van settlement variance, offline sync idempotency, etc.) begin with Phase 2 — see `requirements-matrix.md` and the build plan's per-phase test lists.
+## Phase 2 — Warehouse Inbound (PO, GRN, Purchase Returns)
+
+| Edge case | Behavior | Test |
+|---|---|---|
+| The creator of a PO approves their own PO | Blocked (`SegregationOfDutiesException`) | `tests/Feature/Warehouse/PurchaseOrderLifecycleTest.php` |
+| A different user approves a submitted PO | Succeeds; `approved_by` recorded | same |
+| Every illegal PO status transition (skip a step, act on a terminal state, etc.) | Blocked (`IllegalTransitionException`), enumerated as a Pest dataset | same |
+| A PO is cancelled from draft/submitted/approved | Allowed | same |
+| A PO has any GRN posted against it, then someone tries to cancel it | Blocked — must `ClosePurchaseOrder` instead | `tests/Feature/Warehouse/PurchaseOrderCancelledAfterPartialGrnTest.php` |
+| Two partial GRNs are posted against the same PO line | `qty_received` sums exactly; PO status becomes `partially_received` then `received` | `tests/Feature/Warehouse/GrnPartialReceiptTest.php` |
+| A GRN is posted twice | Blocked (`ImmutableRecordException`) — status guard, not just a UI disable | same |
+| Receiving more than the PO's remaining quantity, no `grn.override` | Blocked (`OverReceiptNotAllowedException`) | `tests/Feature/Warehouse/GrnOverReceiptTest.php` |
+| Same, with `grn.override` granted | Allowed, and the GRN creation is itself audited (`Auditable` on `Grn`) | same |
+| Several GRNs posted against one PO line, in sequence | Accumulate to the exact expected total — the property an atomic `col = col + ?` increment guarantees under real concurrency too (see `decisions.md` ADR-20 for why literal thread-concurrency testing isn't meaningful on SQLite `:memory:`) | `tests/Feature/Warehouse/GrnConcurrentReceiptTest.php` |
+| Posting a GRN | Debits Inventory and credits Accounts Payable for the exact same amount, credit line tagged to the supplier via `partner_type`/`partner_id` | `tests/Feature/Warehouse/GrnPostsBalancedJournalTest.php` |
+| Multiple suppliers with posted GRNs | The AP control account's total exactly equals the sum of its per-supplier sub-ledger lines | same |
+| GRN line for an expiry-tracked product with a batch number and future expiry | Batch created (or reused if the batch number already exists for that product), carried onto the stock ledger entry at posting | `tests/Feature/Warehouse/GrnBatchExpiryTest.php` |
+| GRN line naming a batch number that already exists for that product | Reuses the existing batch — no duplicate, no unique-constraint error | same |
+| GRN line with an expiry date already in the past | Blocked (`ExpiredBatchException`) — reuses the exact Phase 1 guard, not a re-implementation | same |
+| A direct GRN (no PO) without `grn.direct.create` | Blocked (`AuthorizationException`) | `tests/Feature/Warehouse/DirectGrnTest.php` |
+| A direct GRN with `grn.direct.create` | Succeeds, `po_id` is null, posts stock normally | same |
+| A purchase return for more than a GRN line's received quantity, in one request or split across several returns | Blocked (`ExcessiveReturnException`) — the "already returned" running total is recomputed from `purchase_return_items`, not cached | `tests/Feature/Warehouse/PurchaseReturnTest.php` |
+| A purchase return for exactly the remaining returnable quantity | Allowed | same |
+| A purchase return posts | Reduces warehouse stock (`StockMover`) and reverses the GRN's accounting (Dr AP / Cr Inventory) | same |
+| Phase 1's `RolePermissionSeeder` granted `grn.direct.create`/`grn.override` to every `warehouse_manager` by default | Found by the tests written to prove these are blocked without permission — fixed to be a per-user elevation, not a role default | see `decisions.md` ADR-23 |
+
+Business-workflow edge cases still pending: FEFO issuing, credit limits, van settlement variance, offline sync idempotency, etc. — begin with Phase 3 onward, see `requirements-matrix.md` and the build plan's per-phase test lists.

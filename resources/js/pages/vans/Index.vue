@@ -1,9 +1,10 @@
 <script lang="ts" setup>
 import { Link } from '@inertiajs/vue3';
-import { PlusIcon, SquarePenIcon } from '@lucide/vue';
+import { EyeIcon, PlusIcon, SquarePenIcon } from '@lucide/vue';
 import BaseTable from '@/components/DataTable/BaseTable.vue';
+import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
-import { create, edit } from '@/routes/vans';
+import { create, edit, show } from '@/routes/vans';
 import type { ColumnDef } from '@/types';
 
 interface Van {
@@ -44,17 +45,17 @@ const thead: ColumnDef[] = ['Code', 'Vehicle No.', 'Warehouse', 'DSR', 'Status',
                 <td class="px-3 py-2">{{ van.warehouse.name }}</td>
                 <td class="px-3 py-2">{{ van.dsr?.name ?? '—' }}</td>
                 <td class="px-3 py-2">
-                    <span
-                        class="rounded-full px-2 py-0.5 text-xs font-medium"
-                        :class="van.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'"
-                    >
-                        {{ van.is_active ? 'Active' : 'Inactive' }}
-                    </span>
+                    <Badge :variant="van.is_active ? 'success' : 'neutral'">{{ van.is_active ? 'Active' : 'Inactive' }}</Badge>
                 </td>
                 <td class="px-3 py-2">
-                    <Link :href="edit(van.id).url" title="Reassign DSR">
-                        <SquarePenIcon :size="18" class="text-slate-400 hover:text-primary-light" />
-                    </Link>
+                    <div class="flex items-center gap-3">
+                        <Link :href="show(van.id).url" title="View van">
+                            <EyeIcon :size="18" class="text-slate-400 hover:text-primary-light" />
+                        </Link>
+                        <Link :href="edit(van.id).url" title="Reassign DSR">
+                            <SquarePenIcon :size="18" class="text-slate-400 hover:text-primary-light" />
+                        </Link>
+                    </div>
                 </td>
             </tr>
 
