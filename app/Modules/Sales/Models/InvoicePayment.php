@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property int $id
  * @property int $invoice_id
+ * @property int|null $till_session_id
  * @property string $method
  * @property Money $amount
  * @property string|null $reference
@@ -38,6 +39,14 @@ class InvoicePayment extends Model
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    /**
+     * @return BelongsTo<TillSession, $this>
+     */
+    public function tillSession(): BelongsTo
+    {
+        return $this->belongsTo(TillSession::class);
     }
 
     /**

@@ -94,6 +94,10 @@ final class StockMover
 
     private function isBalanceUniqueViolation(QueryException $e): bool
     {
-        return str_contains($e->getMessage(), 'stock_balances_location_product_batch_unique');
+        // MySQL names the violated key in its message; SQLite reports the
+        // bare table.column list instead (never the index name, even for an
+        // explicitly-named composite unique index) — check for both.
+        return str_contains($e->getMessage(), 'stock_balances_location_product_batch_unique')
+            || str_contains($e->getMessage(), 'stock_balances.location_type, stock_balances.location_id, stock_balances.product_id, stock_balances.batch_id');
     }
 }

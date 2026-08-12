@@ -142,3 +142,179 @@ Two PHPStan issues surfaced once the PO controller (and the Show-page pattern ge
 ## ADR-23 — Fixed an RBAC over-grant found by the tests meant to prevent it
 
 While writing `GrnOverReceiptTest`/`DirectGrnTest`, both "blocked without permission" assertions failed — not because the permission checks were broken, but because Phase 1's `RolePermissionSeeder` had granted `grn.direct.create` and `grn.override` to the default `warehouse_manager` role, making every warehouse manager already privileged and the checks unreachable. Removed both from the role's default grant; they're now an explicit per-user elevation on top of the role (`$user->givePermissionTo('grn.override')`), matching how the tests — and the spec's framing of these as exceptional escape hatches — actually intend them to work.
+
+---
+
+# Phase 3 — Warehouse Outbound (Sales Order, Proforma, Invoice, Credit Notes)
+
+## ADR-24 — New `Sales` module, depending on Warehouse's `StockMover`/`FefoStockPicker` and Finance's `PostingEngine`
+
+**Decision.** Outbound documents (`SalesOrder`, `ProformaInvoice`, `Invoice`, `CreditNote`) get their own `App\Modules\Sales\` module rather than being added to the already-large `Warehouse` module. `ConvertToInvoice` and `CreateCreditNote` call Warehouse's `StockMover`/`FefoStockPicker` and Finance's `PostingEngine`/`ChartOfAccountResolver` as public services — the established cross-module boundary from ADR-1 (calls only through a module's public Actions/Domain services, never another module's models directly for anything beyond a typed relation).
+**Chart of Accounts.** Extended `config/accounting.php` and `ChartOfAccountResolver` with `cashOnHand()`, `accountsReceivable()`, `salesRevenue()`, `cogs()`, alongside Phase 2's `inventory()`/`accountsPayable()` — same "resolve by configured code, never a hardcoded ID" pattern as ADR-21.
+
+## ADR-25 — `credit_limit = 0` means "no credit allowed," not "unlimited"
+
+**Context.** SO-04 requires a credit-limit check before invoicing. A `credit_limit` of `0` is ambiguous in the abstract — it could mean "not configured, don't enforce" or "cash-only customer."
+**Decision.** `0` genuinely means **no credit allowed**: `CustomerCreditLimitCheck::wouldExceedLimit()` derives the customer's live outstanding AR balance from `journal_lines` (never a cached column, filtered by the AR account + `partner_type`/`partner_id`) and compares `outstanding + newCharge > credit_limit` — so a `0`-limit customer fails that check on their very first invoice unless paid in full immediately. `ConvertToInvoice` blocks with `CreditLimitExceededException` unless the acting user has `sales.credit_override` (an elevated per-user permission, **not** granted to `warehouse_manager` by default — same discipline as ADR-23, deliberately avoided from the start this time rather than caught by a failing test after the fact).
+**Verified by.** `ConvertToInvoiceCreditLimitTest.php` (blocked without override, allowed with it, and `sales.credit_override` absent from the role's default grant).
+
+## ADR-26 — Overpayment is never capped; it becomes the customer's credit balance
+
+**Decision.** `RecordInvoicePayment` never caps a payment at the invoice's remaining balance — it posts the full amount (Dr Cash/Cr AR) regardless, then recomputes the invoice's paid-status from the sum of its payments (`paid` once `totalPaid >= grand_total`). An overpayment simply drives that customer's AR balance negative. No separate "customer credit balance" column or ledger exists — the negative AR balance *is* the credit, queryable via the same `CustomerCreditLimitCheck::outstandingBalance()` used for the credit-limit check, so the two features share one source of truth by construction.
+**Verified by.** `InvoiceOverpaymentBecomesCreditTest.php`.
+
+## ADR-27 — Tax rate and per-line rounding: recomputed fresh, never re-rounded at the document level
+
+**Decision, tax rate.** `ConvertToInvoice::convert()` always re-fetches the product's *current* `tax_rate` at conversion time and recomputes `lineGross->percentage($rate)` itself — it never accepts a tax figure from the caller's items array at all (the array only carries `product_id`/`qty`/`unit_price`/`discount`). This removes "stale tax rate copied from the Sales Order" as a possible bug by construction rather than by caller discipline, since a Sales Order can sit in `draft`/`confirmed`/`fulfilled` for an arbitrary time before conversion while tax policy changes.
+**Decision, rounding.** Every document total (`subtotal`, `tax_total`, `discount_total`, `grand_total`) is a running sum of already-rounded per-line `Money` amounts — never an independent `documentSubtotal->percentage(rate)` recomputation. The two can legitimately disagree by a pesewa (e.g. summing `round(376.125)+round(188.375) = 564` vs. `round(564.5) = 565` on the combined subtotal); only the per-line-sum approach is correct, since it's what the customer's printed line items actually add up to.
+**Verified by.** `TaxRateAtInvoiceDateTest.php` (rate changed between order and conversion; invoice uses the rate at conversion time), `RoundingSumsExactlyTest.php` (the 564-vs-565 case, by exact minor-unit assertion).
+
+## ADR-28 — `Warehouse $warehouse` relation swapped for a raw `warehouse_id` in `ConvertToInvoice`
+
+**Context.** `ConvertToInvoice::convert()` originally took a full `Warehouse $warehouse` object, resolved via `$salesOrder->warehouse` / `$proforma->warehouse` (Eloquent `belongsTo`). The `Warehouse` model carries a `WarehouseScope` global scope (ADR-2, Phase 1) restricting non-super-admin users to warehouses they're assigned to via the `warehouse_user` pivot. A `warehouse_manager` acting on a Sales Order for a warehouse they aren't explicitly pivoted to — a legitimate case, since `CreateSalesOrder`/`CreateProformaInvoice` never required that pivot to exist — got a silent `null` back from the relation, surfacing as a fatal `TypeError` deep in `ConvertToInvoice` rather than a clear authorization error.
+**Decision.** `convert()` now takes `int $warehouseId` and both callers pass `$salesOrder->warehouse_id` / `$proforma->warehouse_id` directly — plain columns already on hand, no relation lookup. Every actual use of the parameter inside `convert()` was already just `->id` (document number scope, `Invoice.warehouse_id`, `FefoStockPicker`/`StockMover` location id), so the full model was never needed. This also matches `CreateSalesOrder`/`CreateProformaInvoice`'s existing signatures (`int $warehouseId`), and `CreateCreditNote` was already doing the same thing via `$invoice->warehouse_id`.
+**Takeaway for later phases.** Don't resolve a scoped model's relation just to read its `id` inside an already-authorized internal Action — pass the id through from wherever it's already a plain column. If a future Action genuinely needs warehouse *attributes* (name, manager) rather than just its id, that's a real case for revisiting `WarehouseScope`'s reach into internal cross-document lookups, not just this workaround.
+**Caught by.** Running the newly-written Phase 3 test suite — `ProformaExpiredConversionBlockedTest`'s non-expired-conversion case failed with exactly this `TypeError` before the fix.
+
+---
+
+# Phase 4 — Warehouse POS
+
+## ADR-29 — Extracted `InvoiceLineComposer`, shared by `ConvertToInvoice` and `RecordPosSale`
+
+**Context.** POS needs the exact same tax-at-conversion-time computation and FEFO-picked stock/line persistence `ConvertToInvoice` already had, but with a different Invoice-header story (no Sales Order/Proforma, no due date, immediate payment).
+**Decision.** Extracted the line-computation (`compute()` — pure, no side effects, tax/discount/subtotal totals) and line-persistence (`persist()` — FEFO pick + `StockMover` + `InvoiceItem::create`) out of `ConvertToInvoice::convert()` into `App\Modules\Sales\Domain\InvoiceLineComposer`. `ConvertToInvoice` was refactored to use it (re-verified against the full Phase 3 suite — zero regressions); `RecordPosSale` uses the same two methods. Unlike the Phase 3 extractions, this wasn't speculative — two concrete callers needed the identical logic today.
+
+## ADR-30 — POS credit-limit check nets out same-transaction payments; `ConvertToInvoice`'s does not
+
+**Context.** `ConvertToInvoice`'s credit check (ADR-25) compares the full invoice `grand_total` against the customer's credit limit before any payment — correct for a wholesale credit sale, where the invoice is created `unpaid` and paid later. A POS sale is different: payment is (usually) collected in the same transaction as the sale. Applying the gross-total check to POS would block an ordinary fully-paid cash sale for any walk-in/`credit_limit = 0` customer, since the gross total always "exceeds" a zero limit before the payment is counted.
+**Decision.** `RecordPosSale` computes `remainingAfterPayment = grandTotal - Σpayments` and only runs the credit-limit check (and only requires `sales.credit_override` to bypass it) against that remainder. A fully-paid POS sale never touches the credit check at all (remainder ≤ 0). A partially-paid POS sale is checked exactly like a wholesale credit sale would be, on the unpaid remainder — same rule, same override permission, just evaluated after netting the immediate payment instead of before it.
+**Verified by.** `PosSplitPaymentTest.php` (fully-paid `credit_limit=1000` customer; a partial payment leaves the invoice `partially_paid` without needing an override since it's within the limit), `PosSaleConcurrentLastUnitTest.php`.
+
+## ADR-31 — POS discount-override threshold: a config-driven percentage, not a copy of the credit-limit pattern
+
+**Context.** POS-04 requires price/discount control with an escape hatch, mirroring the `grn.override`/`sales.credit_override` shape (ADR-23/25) but for a different quantity — a discount *rate*, not a monetary limit tied to a specific customer.
+**Decision.** `config('sales.pos_discount_override_threshold_percent')` (env `SALES_POS_DISCOUNT_OVERRIDE_THRESHOLD_PERCENT`, default 10) is compared per-line against `discount / (unit_price × qty) × 100`, computed from already-known `Money`/`Quantity` values (not re-derived from stored minor units in a way that could round differently). Exceeding it without the new `pos.discount_override` permission throws `DiscountOverrideRequiredException`. `pos.discount_override` is **not** granted to `wholesale_cashier` by default — same discipline as every other elevation in this codebase (ADR-23/25), applied from the start this time.
+**Verified by.** `PosDiscountOverrideThresholdTest.php`.
+
+## ADR-32 — Till variance posts to a single "Cash Over/Short" account, both directions
+
+**Context.** POS-03's X/Z report needs to post the difference between a till's expected and counted cash to the general ledger.
+**Decision.** One account (code `5900`, type `expense` by convention) absorbs both shortages (Dr Cash Over/Short / Cr Cash on Hand) and overages (Dr Cash on Hand / Cr Cash Over/Short) — standard retail-accounting practice, since till variances are normally small and their net effect across many sessions is what matters, not classifying each occurrence separately. `CloseTillSession` only calls `PostingEngine::post('till.closed_with_variance', ...)` when `variance !== 0`; a balanced till posts nothing (`PostingEngine`/`JournalLineData` already reject a zero-amount line — see Phase 0's edge cases — so this skip is required, not just tidy).
+**Verified by.** `TillZReportVarianceTest.php` (shortage, overage, and a zero-variance case verified indirectly via `TillSessionLifecycleTest.php`'s "posts nothing" assertion).
+
+## ADR-33 — `TillSessionTransitions` deliberately does not treat same-state as a no-op
+
+**Context.** Every other `*Transitions` guard (`PurchaseOrderTransitions`, `SalesOrderTransitions`, `InvoiceTransitions`) short-circuits `assertCanTransition($from, $to)` when `$from === $to`, treating a same-state call as a harmless idempotent retry. `TillSessionTransitions` was written the same way initially.
+**Problem found.** `CloseTillSession`'s body always recomputes the expected float and conditionally re-posts the variance journal after calling the guard — the guard merely *returning* on `'closed' -> 'closed'` (instead of throwing) doesn't stop the rest of the method from running. A second `CloseTillSession` call against an already-closed session would have silently recomputed and potentially double-posted a variance journal entry — a real financial-integrity bug, caught by `TillSessionLifecycleTest`'s "closing an already-closed till session is blocked" test failing.
+**Decision.** `TillSessionTransitions::assertCanTransition()` has no same-state shortcut — `'closed' -> 'closed'` throws `IllegalTransitionException` like any other disallowed transition, since `ALLOWED['closed'] = []`. This is a **deliberate divergence** from the other three guards, not an oversight; the shared "same-state is a no-op" convention is only safe when the calling Action's body is itself idempotent on a repeat call, which `CloseTillSession`'s is not.
+**Takeaway for later phases.** Before reusing the same-state-no-op convention on a new `*Transitions` guard, check whether the Action calling it does real, non-idempotent work (side effects, postings) after the guard call — if so, favor `TillSessionTransitions`'s stricter shape instead.
+**Verified by.** `TillSessionLifecycleTest.php`.
+
+## ADR-34 — Reinterpreted `SessionExpiryMidSaleTest` and `PosSaleConcurrentLastUnitTest` for what the backend actually guarantees
+
+**Context.** The build plan names these tests for behavior a POS *frontend* would own (an in-browser cart surviving a session timeout; two physical tills racing on the same network). Phase 4, like Phase 2/3, has no web/UI layer — there's no cart-persistence backend and, per `decisions.md` ADR-20's already-established reasoning, SQLite `:memory:` makes literal multi-connection concurrency testing meaningless (separate connections are separate databases).
+**Decision.** Reinterpreted both around the actual backend guarantee, the same way Phase 3 reinterpreted `UnitConversionSaleFromCartonTest` (ADR-27's sibling case, not separately numbered): `SessionExpiryMidSaleTest` proves a sale attempted against a *closed* till session is rejected and leaves zero partial `Invoice`/stock-ledger/journal rows behind (the transaction-atomicity guarantee that actually matters once a real frontend adds session-expiry-triggered till closure). `PosSaleConcurrentLastUnitTest` proves sequential last-unit contention is rejected on the second attempt, mirroring `GrnConcurrentReceiptTest`'s documented precedent rather than re-deriving new reasoning.
+**Verified by.** `SessionExpiryMidSaleTest.php`, `PosSaleConcurrentLastUnitTest.php`.
+
+---
+
+# Phase 5 — Van / DSR Operations
+
+## ADR-35 — Loadout/loadin restricted to non-batch-tracked products; batch-tracked support deferred
+
+**Context.** `FefoStockPicker` splits a requested quantity across however many batches are needed, producing one `InvoiceItem` row per pick (Sales module). `LoadoutRequestItem`/`LoadinRequestItem` are single rows per product with plain `qty_*` columns — there is no equivalent fan-out structure for a loadout line to record "3 units from batch A, 2 from batch B."
+**Decision.** `RequestLoadout` and `RequestLoadin` reject any line whose product has `track_expiry = true` outright (`BatchTrackedLoadoutUnsupportedException`), rather than silently moving stock against `batch_id = 0` (which would either corrupt a real batch-tracked balance row or silently create a bogus untracked one). All loadout/loadin stock movements use `batchId: null` unconditionally.
+**Consequence.** Van loadouts of batch/expiry-tracked products are out of scope for Phase 5. A future FEFO-aware loadout would need `LoadoutRequestItem` to support multiple batch-split sub-rows per requested line, mirroring `InvoiceItem`'s relationship to a Sales Order line — a real schema change, not a small addition, deferred until actually needed.
+**Verified by.** All Phase 5 tests deliberately use non-tracked products (`createProductFixture()`'s default `trackExpiry: false`, or a custom `CreateProduct` call without `track_expiry`).
+
+## ADR-36 — `StockAvailabilityCheck` extracted as a read-only counterpart to `FefoStockPicker`
+
+**Context.** `RequestLoadout`/`ApproveLoadout`/`RequestLoadin` all need to answer "is there enough stock at this location for this product" without actually picking or moving anything (the real movement happens later, at `ConfirmLoadoutReceipt`/`AcceptLoadin` — see ADR-35's LO-03 note below). `FefoStockPicker::pick()` both validates *and* returns specific batch picks, which is more than these call sites need and doesn't fit the "check now, move later" shape.
+**Decision.** `App\Modules\Warehouse\Domain\StockAvailabilityCheck::assertAvailable(locationType, locationId, productId, qty)` — a small, side-effect-free check against the `batch_id = 0` balance row, throwing the same `InsufficientStockException` `FefoStockPicker` uses. Placed in the Warehouse module (not Van) since it's a general stock concern, reusable by any future non-batch-tracked availability check.
+**Verified by.** `LoadoutExceedsWarehouseStockTest.php` (both at request and at approval-time qty-edit).
+
+## ADR-37 — LO-03: loadout stock only moves at Received confirmation; the discrepancy is recorded, not absorbed
+
+**Decision.** `RequestLoadout` and `ApproveLoadout` only validate availability and record intent (`qty_requested`/`qty_approved`); `MarkLoadoutLoaded` is a pure status checkpoint recording `qty_loaded` with **no ledger entry**. The only stock movement happens in `ConfirmLoadoutReceipt`: warehouse OUT of `qty_loaded` (what physically left), van IN of `qty_received` (what physically arrived) — using the DSR's confirmed figure, not the loaded figure, for the van side. Any shortfall (`qty_loaded - qty_received`) is captured via `LoadoutRequestItem::discrepancy()` but is not booked anywhere else: it simply isn't in either location's balance, matching physical reality (goods lost in transit aren't "in stock" anywhere).
+**Verified by.** `LoadoutPartialConfirmationDiscrepancyTest.php` (warehouse loses the full loaded qty; van gains only the received qty; the discrepancy is queryable, not silently zero).
+
+## ADR-38 — `LoadoutTransitions`/`LoadinTransitions` follow `TillSessionTransitions`'s no-same-state-no-op rule
+
+**Decision.** Both new guards omit the `$from === $to` shortcut used by `PurchaseOrderTransitions`/`SalesOrderTransitions`/`InvoiceTransitions` (ADR-33's precedent) — `ConfirmLoadoutReceipt` moves real stock and `AcceptLoadin` moves stock *and* conditionally posts a write-off, so a silent no-op on a repeat call (`'received' -> 'received'`, `'accepted' -> 'accepted'`) would risk double-moving stock or double-posting. Applied proactively this time, not discovered by a failing test — see ADR-33's own "takeaway for later phases" note, which this directly follows.
+
+## ADR-39 — A third stock location type, `'damages'`, added by widening the existing enum
+
+**Context.** LI-02 calls for damaged loadin stock to move to a "damages virtual location," distinct from `'warehouse'`/`'van'`. `stock_ledger.location_type`/`stock_balances.location_type` are DB-level `enum('warehouse', 'van')` columns.
+**Decision.** Widened both enums to `('warehouse', 'van', 'damages')` via a dialect-branching migration (native `ALTER ... MODIFY` on MySQL; Laravel's `Blueprint::enum()->change()` on SQLite, which rebuilds the table). Damaged stock uses `location_type = 'damages'`, `location_id = warehouse_id` — one damages location per warehouse, the same `location_id` convention `'warehouse'` itself uses.
+**Risk, mitigated.** Per ADR-15, any SQLite table rebuild silently drops triggers attached to that table — `stock_ledger`'s append-only triggers were a casualty here too, exactly as they were for the FK-add migration in Phase 1. A follow-up migration re-creates them (`2026_07_31_110006_...`), identical in approach to `2026_07_31_070013_...`. Re-verified via `tests/Feature/Foundation/StockLedgerImmutabilityTest.php` after both migrations ran.
+
+## ADR-40 — Added `RecordVanSale`, not named in the build plan's Phase 5 Action list, because the settlement identity needs real sales data
+
+**Context.** The plan's `GenerateDsrSettlement` formula ("opening + loadouts − sales − loadins = closing") references "sales" as an input, but no Action creates a van-sourced sale — `ConvertToInvoice`/`RecordPosSale` (Phases 3-4) only ever draw stock from a warehouse.
+**Decision.** Added `App\Modules\Sales\Actions\RecordVanSale`, mirroring `RecordPosSale`'s shape (immediate posting, no draft/confirm lifecycle, credit-limit check nets out same-transaction payments — ADR-30's reasoning applies identically to a DSR field sale) but keyed to a `van_storage_id` instead of a `till_session_id`. Required generalizing `InvoiceLineComposer::persist()` from a hardcoded `'warehouse'` location to an explicit `(string $locationType, int $locationId)` pair — `ConvertToInvoice`/`RecordPosSale` updated to pass `'warehouse'` explicitly; both re-verified against their full test suites (zero regressions).
+**Schema.** `invoices.source` enum widened to add `'van'`; `invoices.van_storage_id` nullable FK added (same dialect-branching migration pattern as ADR-39, but no trigger-recreation follow-up needed since `invoices` has no triggers).
+**Verified by.** `DsrSettlementIdentityInvariantTest.php`, `CashShortOverVarianceSignoffTest.php`.
+
+## ADR-41 — `GenerateDsrSettlement`'s stock-value identity is computed entirely from `stock_ledger`, not an independent valuation
+
+**Context.** "opening + loadout − sales − loadin = closing" could be verified two ways: (a) compute all four terms from `stock_ledger` and check they sum correctly, or (b) compute opening/movements from the ledger and independently value the *live* `stock_balances.qty_on_hand` against some costing method (FIFO, weighted-average) to cross-check `closing`.
+**Decision.** Went with (a). No inventory valuation method exists anywhere in this codebase yet — `stock_balances` tracks quantity only, and every cost figure elsewhere (`InvoiceItem.unit_cost`, `LoadoutRequestItem.unit_cost`, ...) is a per-movement snapshot of `Product.cost_price` at that moment, not a computed running value. Introducing a valuation method just for this one identity check would be new, undesigned scope. `DsrSettlementIdentityInvariantTest` is therefore a regression guard on the settlement's own aggregation logic (four `stock_ledger` sums, scoped correctly by `doc_type` and date range, compose into the expected total) rather than an independent physical reconciliation.
+**Sign-off folded into the same Action.** The plan names only `GenerateDsrSettlement`, not a separate sign-off Action. Passing an optional `$cashCounted` computes the variance and marks the settlement `signed_off` in the same call; omitting it leaves a `generated` settlement's cash fields untouched on a later re-generation (`updateOrCreate` keyed on `(van_storage_id, settlement_date)`, unique-constrained at the DB level so a given van/day has exactly one settlement row).
+**Bug found and fixed.** The existing-settlement lookup originally compared `where('settlement_date', $date->toDateString())` against Eloquent's own `'date'`-cast column — but the cast's *write* path stores a full `Y-m-d H:i:s` string, not a bare date, so the plain equality lookup never matched and every call attempted a fresh `INSERT`, colliding with the unique constraint on the second call for the same van/day. Fixed with `whereDate('settlement_date', ...)`, which compares only the date portion regardless of how the column is actually stored — caught by `DsrSettlementIdentityInvariantTest`'s and `CashShortOverVarianceSignoffTest`'s "generate twice" cases.
+**Verified by.** `DsrSettlementIdentityInvariantTest.php`, `CashShortOverVarianceSignoffTest.php`.
+
+---
+
+# Phase 6 — Financial Management
+
+## ADR-42 — Fiscal periods are opt-in: unconfigured dates stay unrestricted
+
+**Context.** FIN-05 requires posting blocked into a closed fiscal period. `journal_entries.fiscal_period_id` has existed as a nullable FK since Phase 0, but `PostingEngine::post()` never set it — every prior phase's tests post freely with zero `FiscalPeriod` rows ever seeded.
+**Decision.** `PostingEngine::post()` now resolves the `FiscalPeriod` covering the posting date (`starts_on <= date <= ends_on`) on every call. If none exists, posting proceeds unrestricted (`fiscal_period_id` stays null) — periods are something an accountant opts into by creating them, not a mandatory gate from day one. If one exists and is closed, `PostingIntoClosedPeriodException` is thrown *before* the transaction opens. This kept all 175 pre-Phase-6 tests passing unmodified, since none of them seed a `FiscalPeriod`.
+**Verified by.** `PostingIntoClosedPeriodRejectedTest.php` (both the closed-period block and the no-period-configured passthrough).
+
+## ADR-43 — `ReverseJournal` reuses `PostingEngine`, not a hand-rolled `JournalEntry::create`
+
+**Decision.** Rather than writing a second, parallel path that directly creates a `JournalEntry`/`JournalLine` pair, `ReverseJournal` introduces `JournalReversalPostingRule` (reads the original journal's own lines, swaps debit↔credit) and calls `PostingEngine::post('journal.reversed', $originalJournal)` like every other posting. This means reversals get fiscal-period enforcement and the balance assertion for free, and there is exactly one code path that ever writes to `journal_entries`/`journal_lines` — not two. `reversal_of_id` (a plain FK, not something `PostingEngine::post()`'s generic signature knows about) is set via a follow-up `update()` after the post call returns.
+**Guard.** New `JournalEntryTransitions` (posted → reversed only) follows `TillSessionTransitions`'s no-same-state-no-op rule (ADR-33/38): reversing an already-reversed entry must throw, not silently no-op, since the Action's body does real work on every call.
+**Verified by.** `ReversalOfReversalTest.php` — reversing a reversal reproduces the original's exact lines (double negation), and reversing the same entry twice is blocked.
+
+## ADR-44 — Manual journal approval: `PostManualJournal` decides immediate-vs-held by comparing against a config threshold; `ApproveManualJournal` is a separate, plan-unlisted Action
+
+**Context.** The plan names only `PostManualJournal` ("approval required above a configurable threshold"), but a threshold-gated approval workflow structurally needs two actors: whoever requests it, and — only above the threshold — a different person who approves it before it actually posts.
+**Decision.** `PostManualJournal` always persists a `ManualJournal` + its `ManualJournalLine` rows (audit trail exists regardless of outcome) and balance-checks before persisting anything (`UnbalancedJournalException`, same as `PostingEngine`'s own check). If `total_debit <= config('finance.manual_journal_approval_threshold')` (default 5000.00 GHS), it immediately calls `PostingEngine::post('manual_journal.posted', ...)`. Above it, the journal stays `pending_approval` with no `journal_entries` row until the new `ApproveManualJournal` Action — gated by the same `journal.post` permission, enforcing `requester_id !== approver_id` (`SegregationOfDutiesException`, the same exception class reused from Purchase Orders/Loadouts) — calls `PostingEngine::post()` itself. `ManualJournalPostingRule` converts the already-balance-checked `ManualJournalLine` rows into `JournalLineData` 1:1, so both the immediate and approved paths post through the exact same rule.
+**Verified by.** `UnbalancedManualJournalRejectedTest.php`, `JournalApprovalThresholdSegregationTest.php`.
+
+## ADR-45 — DSR cash chain: one shared "Cash in DSR Hand" control account, tagged per-DSR; one journal per collection, not a lump handover
+
+**Context.** BNK-06 wants a DSR's field cash collections traced through collection → handover → deposit, to a person at every hop, without inventing a new "virtual account per DSR."
+**Decision.** Reused the exact control-account pattern from AP/AR (ADR-21): one shared `Cash in DSR Hand` account (code `1020`), with every journal line against it tagged `partner_type = User::class, partner_id = $dsrUserId`. `RecordDsrCollection` posts Dr Cash-in-DSR-Hand(dsr)/Cr AR(customer) — the customer's balance clears immediately even though the cash hasn't reached the business yet. `HandoverDsrCash` hands over *every* `with_dsr` collection for a DSR in one call, but posts **one journal per collection**, not one lump-sum entry — preserving per-collection traceability (which specific sale's cash was handed over when) rather than collapsing it into an aggregate figure that can't be traced back to an individual collection.
+**`Collection.warehouse_id` captured at collection time, not resolved later.** `VanStorage` carries a `VanScope` global scope (ADR-2). Rather than have `DsrCashHandoverPostingRule` resolve `$collection->vanStorage->warehouse_id` (a scoped relation lookup inside an internal posting rule — exactly the shape that caused the real bug in ADR-28), `collections.warehouse_id` is a plain column captured once from the van at `RecordDsrCollection` time. Applied proactively this time, not discovered by a failing test.
+**Verified by.** `DsrCashChainTraceabilityTest.php`.
+
+## ADR-46 — `RegisterBankAccount`/`RegisterExpenseCategory` auto-create a dedicated Chart of Accounts row per instance
+
+**Context.** Every account resolved so far (`ChartOfAccountResolver`) is a single, config-coded, shared account (one Cash on Hand, one AP control, ...). Bank accounts and expense categories are different: there can be arbitrarily many of them, each needing its *own* GL account (a bank statement is worthless if three different bank accounts all post to one shared "Bank" line).
+**Decision.** `RegisterBankAccount`/`RegisterExpenseCategory` each create a `ChartOfAccount` row (caller-supplied `code`) and the owning `BankAccount`/`ExpenseCategory` row in one transaction, linked via `coa_account_id`. Neither Action is named in the plan's Phase 6 Action list — they're the obvious prerequisite plumbing `RecordBankDeposit`/`RecordExpense` need to exist at all, matching the precedent set by `RecordVanSale` (ADR-40): build what a named, tested requirement structurally depends on, even if the plan's Action list didn't spell out every supporting piece.
+**No permission gate.** Matches `CreateUnit`/other simple lookup-creation Actions in this codebase (no `Gate::authorize()` call) rather than inventing an ill-fitting permission slug for "register a bank account."
+
+## ADR-47 — Only `TrialBalance` built from the plan's 10 named report types; the other 9 are deferred, not stubbed
+
+**Context.** The plan lists 10 read-only report query services (TrialBalance, ProfitAndLoss, BalanceSheet, GeneralLedger, CashBook, BankBook, ArApAging, CustomerSupplierStatement, DsrCashPosition, Tax). Only `TrialBalanceBalancesInvariantTest` and `ArApControlReconciliationInvariantTest` are named as Phase 6 tests, and AR/AP control reconciliation doesn't need a dedicated report *class* — it's directly queryable via `journal_lines`, exactly how `GrnPostsBalancedJournalTest` already proved the AP half in Phase 2.
+**Decision.** Built `App\Modules\Finance\Domain\Reports\TrialBalance` (a live per-account debit/credit summary from `journal_lines`) and nothing else from that list. Building the other 9 with no test to validate them would violate this project's own standing rule: nothing is marked DONE without a passing test citing it, and speculative untested report classes are exactly the kind of scope CLAUDE.md's "don't build beyond what's asked" guidance rules out. `requirements-matrix.md` marks FIN-01 PARTIAL rather than claiming full report coverage.
+**Takeaway for later phases.** Build the remaining report types on demand, each with its own test, rather than pre-building a report library speculatively.
+
+## ADR-48 — Fixed a latent SQLite unique-violation detection bug in three places, discovered while building bank deposit duplicate-slip-reference handling
+
+**Context.** `RecordBankDeposit`'s duplicate-slip-reference test failed even though the correct exception class existed and the catch block looked right. Investigation (empirically reproducing a duplicate-key insert in isolation) showed SQLite's `UNIQUE constraint failed` message **never includes the violated index's name** — not even for an explicitly-named composite unique index — only the bare `table.column[, table.column, ...]` list. MySQL's message *does* include the index name. The existing string-match (`str_contains($message, 'bank_transactions_slip_reference_unique')`) only ever matches MySQL's format.
+**Consequence, found by inspection, not a failing test.** The exact same pattern already existed in two Phase 0/2 files — `StockMover::isBalanceUniqueViolation()` and `DocumentNumberGenerator::isSequenceUniqueViolation()` — both guarding a retry-on-race-condition path. On SQLite (this project's test database), the check silently never matches, so a genuine unique-constraint race would propagate as a raw `QueryException` instead of being retried. This never surfaced as a failing test because the retry path needs a true concurrent-insert race to exercise, which — per `GrnConcurrentReceiptTest`'s own documented reasoning (ADR-20) — SQLite's `:memory:` database can't produce (separate connections are separate databases).
+**Decision.** Fixed all three call sites to check for *both* the MySQL-style named-index string and the SQLite-style bare `table.column` string, rather than just the one this phase's own code needed. Left the underlying retry *logic* untouched — only the detection string was wrong.
+**Verified by.** `DuplicateDepositSlipReferenceBlockedTest.php` directly exercises the new bank-deposit path (a real, easily-reproducible unique violation, unlike the two pre-existing race-only paths, which remain effectively untested for this specific detection branch).
+
+## ADR-49 — `CreateGrnFromPo` only drafts a GRN; `PostGrn` is the separate posting step — a test-writing mistake, not a design flaw
+
+**Context.** Writing `ArApControlReconciliationInvariantTest`, calling only `CreateGrnFromPo` produced zero `stock_ledger`/`journal_entries` rows despite the GRN itself being created successfully (no exception).
+**Root cause.** `CreateGrnFromPo` (Phase 2) only ever creates a `draft` GRN — receiving-quantity validation and `GrnItem` creation, nothing else. The actual stock movement and Dr Inventory/Cr AP posting happens in the separate `PostGrn` Action, which this test never called. This is Phase 2's existing, already-tested, correct design (`GrnPostsBalancedJournalTest.php` already calls both in sequence) — not a bug in the posting pipeline itself.
+**Fix.** Added the missing `app(PostGrn::class)->execute($grn)` call after each `CreateGrnFromPo` call in the test.
+**Takeaway for later phases.** When a new test reuses another module's multi-step document lifecycle (draft → post, request → approve → ...), check that module's own tests for the full call sequence rather than assuming a single "create" Action does everything.

@@ -3,14 +3,15 @@
 namespace App\Modules\Sales\Models;
 
 use App\Casts\MoneyCast;
-use App\Models\User;
 use App\Modules\MasterData\Models\Customer;
+use App\Modules\Van\Models\VanStorage;
 use App\Modules\Warehouse\Models\Warehouse;
 use App\Support\Auditable;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -18,9 +19,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $source
  * @property int $customer_id
  * @property int $warehouse_id
+ * @property int|null $van_storage_id
  * @property int|null $sales_order_id
  * @property int|null $proforma_invoice_id
- * @property \Illuminate\Support\Carbon|null $due_date
+ * @property Carbon|null $due_date
  * @property string $status
  * @property Money $subtotal
  * @property Money $tax_total
@@ -64,6 +66,14 @@ class Invoice extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);
+    }
+
+    /**
+     * @return BelongsTo<VanStorage, $this>
+     */
+    public function vanStorage(): BelongsTo
+    {
+        return $this->belongsTo(VanStorage::class);
     }
 
     /**

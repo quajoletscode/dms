@@ -62,7 +62,11 @@ final class DocumentNumberGenerator
 
     private function isSequenceUniqueViolation(QueryException $e): bool
     {
-        return str_contains($e->getMessage(), 'doc_number_scope_unique');
+        // MySQL names the violated key in its message; SQLite reports the
+        // bare table.column list instead (never the index name, even for an
+        // explicitly-named composite unique index) — check for both.
+        return str_contains($e->getMessage(), 'doc_number_scope_unique')
+            || str_contains($e->getMessage(), 'document_number_sequences.scope_type, document_number_sequences.scope_id, document_number_sequences.document_type, document_number_sequences.fiscal_year');
     }
 
     /**

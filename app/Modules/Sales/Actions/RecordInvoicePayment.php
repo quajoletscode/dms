@@ -22,11 +22,12 @@ final class RecordInvoicePayment
         private readonly InvoiceTransitions $transitions,
     ) {}
 
-    public function execute(Invoice $invoice, Money $amount, string $method, ?string $reference = null, ?string $clientUuid = null): InvoicePayment
+    public function execute(Invoice $invoice, Money $amount, string $method, ?string $reference = null, ?string $clientUuid = null, ?int $tillSessionId = null): InvoicePayment
     {
-        return DB::transaction(function () use ($invoice, $amount, $method, $reference, $clientUuid) {
+        return DB::transaction(function () use ($invoice, $amount, $method, $reference, $clientUuid, $tillSessionId) {
             $payment = InvoicePayment::query()->create([
                 'invoice_id' => $invoice->id,
+                'till_session_id' => $tillSessionId,
                 'method' => $method,
                 'amount' => $amount->minorUnits,
                 'reference' => $reference,

@@ -41,6 +41,26 @@ final class ChartOfAccountResolver
         return $this->byConfigKey('cogs');
     }
 
+    public function cashOverShort(): ChartOfAccount
+    {
+        return $this->byConfigKey('cash_over_short');
+    }
+
+    public function inventoryLoss(): ChartOfAccount
+    {
+        return $this->byConfigKey('inventory_loss');
+    }
+
+    public function bankCharges(): ChartOfAccount
+    {
+        return $this->byConfigKey('bank_charges');
+    }
+
+    public function cashInDsrHand(): ChartOfAccount
+    {
+        return $this->byConfigKey('cash_in_dsr_hand');
+    }
+
     private function byConfigKey(string $key): ChartOfAccount
     {
         $code = (string) config("accounting.accounts.{$key}");

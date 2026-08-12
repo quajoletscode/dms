@@ -32,7 +32,13 @@ final class CreateCreditNote
      */
     public function execute(Invoice $invoice, array $items, string $reasonCode): CreditNote
     {
-        return DB::transaction(function () use ($invoice, $items, $reasonCode) {
+        // Stock must return to wherever it was actually sold from — a van
+        // sale's stock came out of the van, not the van's home warehouse.
+        $isVanSourced = $invoice->source === 'van' && $invoice->van_storage_id !== null;
+        $returnLocationType = $isVanSourced ? 'van' : 'warehouse';
+        $returnLocationId = $isVanSourced ? $invoice->van_storage_id : $invoice->warehouse_id;
+
+        return DB::transaction(function () use ($invoice, $items, $reasonCode, $returnLocationType, $returnLocationId) {
             $creditNote = CreditNote::query()->create([
                 'no' => $this->numbers->next('credit_note', 'warehouse', $invoice->warehouse_id),
                 'invoice_id' => $invoice->id,
@@ -70,8 +76,8 @@ final class CreateCreditNote
                 ]);
 
                 $this->stockMover->move(
-                    locationType: 'warehouse',
-                    locationId: $invoice->warehouse_id,
+                    locationType: $returnLocationType,
+                    locationId: $returnLocationId,
                     productId: $invoiceItem->product_id,
                     batchId: $invoiceItem->batch_id,
                     qtyIn: $qty,

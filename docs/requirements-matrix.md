@@ -34,7 +34,7 @@ Status legend: **DONE** (implemented + test passing) · **PARTIAL** (infrastruct
 | WH-01 | Unlimited warehouses, code/name/location/manager | DONE | `WarehouseManagementTest.php`; CRUD UI at `/warehouses` |
 | WH-02 | Warehouse ↔ van storages (1 van = 1 DSR + 1 parent warehouse) | DONE | `VanRegistrationTest.php`, `VanReassignmentTest.php`; CRUD UI at `/vans` |
 | WH-03 | Central product catalogue incl. unit conversions | DONE | `ProductUnitConversionTest.php`; CRUD UI at `/products` (category is optional, no dedicated Category CRUD UI yet) |
-| WH-04 | Batch/lot + expiry tracking, FEFO issuing | PARTIAL | entity + past-expiry guard: `BatchExpiryTest.php`; FEFO *issuing* logic is Phase 3 |
+| WH-04 | Batch/lot + expiry tracking, FEFO issuing | DONE | entity + past-expiry guard: `BatchExpiryTest.php`; FEFO issuing: `FefoIssuingTest.php` |
 | WH-05 | Immutable stock ledger entry per movement | DONE | GRN/purchase-return writes: `GrnPartialReceiptTest.php`, `PurchaseReturnTest.php`; all future stock-moving phases reuse `StockMover` |
 | WH-06 | Reorder-level and expiry alerts | PENDING (Phase 8) | — |
 | PO-01 | Supplier master + ledger | DONE | CRUD UI at `/suppliers`; ledger/statement reporting is Phase 6 |
@@ -45,14 +45,24 @@ Status legend: **DONE** (implemented + test passing) · **PARTIAL** (infrastruct
 | GRN-02 | GRN captures batch/expiry/cost/invoice ref | DONE | `GrnBatchExpiryTest.php` |
 | GRN-03 | GRN posts stock + Dr Inventory/Cr AP | DONE | `GrnPostsBalancedJournalTest.php` |
 | GRN-04 | PO vs GRN discrepancy flagging | PARTIAL | over-receipt is a hard block (permission-gated override), not just a flag: `GrnOverReceiptTest.php`; a discrepancy *report* is Phase 8 |
-| SO-01 | Sales Order lifecycle | PENDING (Phase 3) | — |
-| SO-02 | Proforma Invoice (non-posting) | PENDING (Phase 3) | — |
-| SO-03 | Convert to Invoice posts stock + AR/Revenue/COGS | PENDING (Phase 3) | — |
-| SO-04 | Cash/credit/part payments + credit-limit check | PENDING (Phase 3) | — |
-| SO-05 | Credit notes / sales returns with reason codes | PENDING (Phase 3) | — |
-| POS-01..05 | Warehouse POS (barcode, payments, till, price control) | PENDING (Phase 4) | — |
-| LO-01..04 | Loadout request lifecycle | PENDING (Phase 5) | — |
-| LI-01..03 | Loadin request + van settlement identity | PENDING (Phase 5) | — |
+| SO-01 | Sales Order lifecycle | DONE | `SalesOrderLifecycleTest.php` (dataset of every illegal transition) |
+| SO-02 | Proforma Invoice (non-posting) | DONE | `ProformaNoPostingEffectTest.php`, `ProformaExpiredConversionBlockedTest.php` |
+| SO-03 | Convert to Invoice posts stock + AR/Revenue/COGS | DONE | `FefoIssuingTest.php`, `RoundingSumsExactlyTest.php`, `TaxRateAtInvoiceDateTest.php`, `UnitConversionSaleFromCartonTest.php` |
+| SO-04 | Cash/credit/part payments + credit-limit check | DONE | `InvoicePartPaymentTest.php`, `InvoiceOverpaymentBecomesCreditTest.php`, `ConvertToInvoiceCreditLimitTest.php` |
+| SO-05 | Credit notes / sales returns with reason codes | DONE | `CreditNoteExceedsOriginalBlockedTest.php` |
+| POS-01 | POS sale (barcode/search cart) posts stock + journal immediately | DONE | `RecordPosSale`: `PosSplitPaymentTest.php`, `PosSaleConcurrentLastUnitTest.php` |
+| POS-02 | Split payments across methods | DONE | `PosSplitPaymentTest.php` |
+| POS-03 | Till session open/close with X/Z report (expected vs counted, variance posted) | DONE | `TillSessionLifecycleTest.php`, `TillZReportVarianceTest.php` |
+| POS-04 | Discount/price control with permission-gated override | DONE | `PosDiscountOverrideThresholdTest.php` |
+| POS-05 | Mid-shift cash in/out | DONE | `CashInOut`: `TillZReportVarianceTest.php` |
+| LO-01 | Loadout request lifecycle (requested→approved→loaded→received/rejected) | DONE | `LoadoutApprovalSegregationTest.php`; illegal transitions via `LoadoutTransitions` |
+| LO-02 | Segregation of duties (requester ≠ approver), editable approved qty | DONE | `LoadoutApprovalSegregationTest.php` |
+| LO-03 | Stock moves warehouse→van only at Received confirmation; 'loaded' is a status-only checkpoint | DONE | `LoadoutPartialConfirmationDiscrepancyTest.php`, `LoadoutStuckInTransitReportTest.php` |
+| LO-04 | Loadout discrepancy (received ≠ loaded) recorded, not silently absorbed | DONE | `LoadoutPartialConfirmationDiscrepancyTest.php` |
+| LI-01 | Loadin request + accept, good stock returns to warehouse | DONE | `LoadinGoodVsDamagedSplitTest.php` |
+| LI-02 | Damaged split moves to a damages location + write-off posting (Dr Inventory Loss/Cr Inventory) | DONE | `LoadinGoodVsDamagedSplitTest.php` |
+| LI-03 | DSR settlement: stock-value identity + cash expected/counted/variance signoff | DONE | `DsrSettlementIdentityInvariantTest.php`, `CashShortOverVarianceSignoffTest.php` |
+| — | DSR field sale from van stock (spec's "sales" input to the settlement formula; no formal ID) | DONE | `RecordVanSale`: exercised throughout `DsrSettlementIdentityInvariantTest.php`/`CashShortOverVarianceSignoffTest.php` |
 | — | Purchase Returns (spec §4.1.9 nav menu; no formal ID) | DONE | `PostPurchaseReturn`: `PurchaseReturnTest.php` |
 
 ## 4.2 DSR / Field Assist Management Module
@@ -68,12 +78,18 @@ Status legend: **DONE** (implemented + test passing) · **PARTIAL** (infrastruct
 
 | ID | Requirement | Status | Test(s) |
 |---|---|---|---|
-| FIN-01 | Hierarchical Chart of Accounts | PARTIAL | table + model exist; minimal seed (Inventory, AP) via `ChartOfAccountSeeder`; full standard template is Phase 6 |
-| FIN-02 | Every financial event posts a balanced journal automatically; manual journals with approval | PARTIAL | real business events now post automatically (`GrnPostingRule`, `PurchaseReturnPostingRule`): `GrnPostsBalancedJournalTest.php`; manual-journal UI + approval threshold is Phase 6 |
-| FIN-03 | Posted journals immutable; corrections via reversal only | DONE | `tests/Feature/Foundation/JournalImmutabilityTest.php` (reversal *documents* land Phase 6) |
-| FIN-04 | AR/AP sub-ledgers reconcile to control accounts | PARTIAL | AP half done: `GrnPostsBalancedJournalTest.php` ("control account reconciles to supplier sub-ledger" test); AR is Phase 3, formal reconciliation report is Phase 6 |
-| FIN-05 | Closeable fiscal periods; posting blocked when closed | PARTIAL | table exists; enforcement is Phase 6 |
-| BNK-01..06 | Banks, deposits, withdrawals, transfers, reconciliation, DSR cash chain | PENDING (Phase 6) | — |
+| FIN-01 | Hierarchical Chart of Accounts | PARTIAL | table + model exist; per-bank-account and per-expense-category GL accounts now auto-created (`RegisterBankAccount`, `RegisterExpenseCategory`); a full standard template (income/expense breakdown beyond what posting rules need) is still Phase 8 polish |
+| FIN-02 | Every financial event posts a balanced journal automatically; manual journals with approval | DONE | automatic: `GrnPostingRule`, `InvoicePostingRule`, ... (all prior phases); manual with threshold-gated approval: `PostManualJournal`/`ApproveManualJournal`, `UnbalancedManualJournalRejectedTest.php`, `JournalApprovalThresholdSegregationTest.php` |
+| FIN-03 | Posted journals immutable; corrections via reversal only | DONE | `tests/Feature/Foundation/JournalImmutabilityTest.php`; reversal: `ReverseJournal`, `ReversalOfReversalTest.php` |
+| FIN-04 | AR/AP sub-ledgers reconcile to control accounts | DONE | `ArApControlReconciliationInvariantTest.php` (both AP and AR, generalizing the pattern first proven in `GrnPostsBalancedJournalTest.php`) |
+| FIN-05 | Closeable fiscal periods; posting blocked when closed | DONE | `CloseFiscalPeriod`; `PostingEngine` resolves and enforces the fiscal period covering the posting date: `PostingIntoClosedPeriodRejectedTest.php` |
+| BNK-01 | Bank accounts, each with its own GL account | DONE | `RegisterBankAccount`; `BankDepositWithdrawalTransferTest.php` |
+| BNK-02 | Deposits, withdrawals, transfers (with charge) | DONE | `BankDepositWithdrawalTransferTest.php` |
+| BNK-03 | Duplicate deposit slip reference blocked | DONE | `DuplicateDepositSlipReferenceBlockedTest.php` |
+| BNK-04 | Bank statement reconciliation | PARTIAL | `ReconcileBankStatement` marks transactions reconciled; covered by `BankDepositWithdrawalTransferTest.php`'s reconciliation case, not a dedicated statement-import/matching flow |
+| BNK-05 | Expenses recorded against a category, paid from cash or a named bank account | DONE | `RecordExpenseTest.php` |
+| BNK-06 | DSR cash chain (collection → handover → deposit), traced to a person at every hop | DONE | `RecordDsrCollection`, `HandoverDsrCash`; `DsrCashChainTraceabilityTest.php` |
+| — | Trial Balance (report; see decisions.md for why the other 9 planned report types are deferred) | DONE | `TrialBalance`; `TrialBalanceBalancesInvariantTest.php` |
 
 ## 8. Non-Functional Requirements (the ones Phase 0 already touches)
 

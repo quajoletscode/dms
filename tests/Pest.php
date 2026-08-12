@@ -1,6 +1,10 @@
 <?php
 
 use App\Models\User;
+use App\Modules\Finance\Actions\RegisterBankAccount;
+use App\Modules\Finance\Actions\RegisterExpenseCategory;
+use App\Modules\Finance\Models\BankAccount;
+use App\Modules\Finance\Models\ExpenseCategory;
 use App\Modules\MasterData\Actions\CreateCustomer;
 use App\Modules\MasterData\Actions\CreateProduct;
 use App\Modules\MasterData\Actions\CreateSupplier;
@@ -8,6 +12,12 @@ use App\Modules\MasterData\Actions\CreateUnit;
 use App\Modules\MasterData\Models\Customer;
 use App\Modules\MasterData\Models\Product;
 use App\Modules\MasterData\Models\Supplier;
+use App\Modules\Sales\Actions\ConfirmSalesOrder;
+use App\Modules\Sales\Actions\OpenTillSession;
+use App\Modules\Sales\Models\SalesOrder;
+use App\Modules\Sales\Models\TillSession;
+use App\Modules\Van\Actions\RegisterVan;
+use App\Modules\Van\Models\VanStorage;
 use App\Modules\Warehouse\Actions\ApprovePurchaseOrder;
 use App\Modules\Warehouse\Actions\CreatePurchaseOrder;
 use App\Modules\Warehouse\Actions\SubmitPurchaseOrder;
@@ -114,6 +124,14 @@ function createManagerUser(): User
     return $user;
 }
 
+function createCashierUser(): User
+{
+    $user = User::factory()->create();
+    $user->assignRole('wholesale_cashier');
+
+    return $user;
+}
+
 function actingAsUser(User $user): void
 {
     Auth::setUser($user);
@@ -157,6 +175,86 @@ function createCustomerFixture(string $creditLimit = '0', string $type = 'wholes
         'name' => 'Test Customer',
         'type' => $type,
         'credit_limit' => $creditLimit,
+    ]);
+}
+
+/**
+ * Drives a draft Sales Order to 'fulfilled' — the only status ConvertToInvoice
+ * accepts — via ConfirmSalesOrder plus a direct status update (there is no
+ * dedicated fulfilment Action yet; picking/packing lands in a later phase).
+ */
+function fulfillSalesOrderFixture(SalesOrder $salesOrder): SalesOrder
+{
+    $salesOrder = app(ConfirmSalesOrder::class)->execute($salesOrder);
+    $salesOrder->update(['status' => 'fulfilled']);
+
+    return $salesOrder->fresh();
+}
+
+/*
+|--------------------------------------------------------------------------
+| Warehouse POS (Phase 4) fixtures
+|--------------------------------------------------------------------------
+*/
+
+function openTillSessionFixture(int $warehouseId, string $openingFloat = '100.00'): TillSession
+{
+    return app(OpenTillSession::class)->execute($warehouseId, $openingFloat);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Van / DSR Operations (Phase 5) fixtures
+|--------------------------------------------------------------------------
+*/
+
+function createDsrUser(): User
+{
+    $user = User::factory()->create();
+    $user->assignRole('dsr');
+
+    return $user;
+}
+
+function createVanFixture(Warehouse $warehouse, ?User $dsr = null): VanStorage
+{
+    return app(RegisterVan::class)->execute([
+        'code' => 'VAN-'.uniqid(),
+        'warehouse_id' => $warehouse->id,
+        'dsr_user_id' => $dsr?->id,
+    ]);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Financial Management (Phase 6) fixtures
+|--------------------------------------------------------------------------
+*/
+
+function createAccountantUser(): User
+{
+    $user = User::factory()->create();
+    $user->assignRole('accountant');
+
+    return $user;
+}
+
+function createBankAccountFixture(string $openingBalance = '0'): BankAccount
+{
+    return app(RegisterBankAccount::class)->execute([
+        'name' => 'Test Bank Account',
+        'account_no' => 'ACC-'.uniqid(),
+        'bank_name' => 'Test Bank',
+        'coa_code' => '11'.random_int(10, 99),
+        'opening_balance' => $openingBalance,
+    ]);
+}
+
+function createExpenseCategoryFixture(): ExpenseCategory
+{
+    return app(RegisterExpenseCategory::class)->execute([
+        'name' => 'Test Expense Category '.uniqid(),
+        'coa_code' => '61'.random_int(10, 99),
     ]);
 }
 

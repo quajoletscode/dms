@@ -3,7 +3,7 @@
     import { Link } from '@inertiajs/vue3';
     import type { LucideProps } from '@lucide/vue';
     import type { FunctionalComponent, HTMLAttributes, StyleValue } from 'vue';
-    import { isFullPathActive, isLinkActive } from '@/composables/useApp';
+    import { isFullPathActive } from '@/composables/useApp';
 
     type LucideIcon = FunctionalComponent<LucideProps>;
 
@@ -15,15 +15,15 @@
         name: string;
         icon?: LucideIcon;
         iconSize?: number;
-        active?: boolean;
     }
 
     const props = withDefaults(defineProps<Props>(), {
         name: 'nav item',
         to: '/',
-        active: false,
         iconSize: 20,
     });
+
+    const isActive = isFullPathActive(props.to);
 
     const emits = defineEmits<{
         (e: 'toggle'): void;
@@ -43,7 +43,7 @@
         props.class,
         {
             'link-active bg-linear-to-l from-primary-light to-primary text-white dark:from-gray-600 dark:to-gray-800':
-                isLinkActive(props.to) || isFullPathActive(props.to).value,
+                isActive,
         },
     ]" :style="props.style" v-bind="$attrs"
       class="nav-menu flex items-center-safe justify-start gap-3 rounded p-2 text-sm! capitalize select-none hover:bg-primary hover:text-white min-[1440px]:text-base dark:hover:bg-gray-600">

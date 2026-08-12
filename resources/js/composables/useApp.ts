@@ -97,24 +97,15 @@ export const isFullPathActive = (
     url: NonNullable<InertiaLinkProps['href']>,
 ) => {
     return computed(() => {
-        // Check for an exact match first
-        if (page.url === url) {
-            return true;
+        if (typeof url !== 'string') {
+            return false;
         }
 
-        // Then, check for a hierarchical match
-        return page.url.split('?')[0].startsWith(`${url}/`);
+        const currentPath = page.url.split('?')[0];
+
+        // Exact match, or a hierarchical (nested-route) match.
+        return currentPath === url || currentPath.startsWith(`${url}/`);
     });
-};
-
-export const isLinkActive = (url: NonNullable<InertiaLinkProps['href']>) => {
-    const c_url = page.url;
-
-    if (typeof url === 'string') {
-        return c_url.split('?')[0] === url;
-    }
-
-    return false;
 };
 
 export const isFilterActive = (key: string) => {
@@ -210,7 +201,6 @@ export function useApp() {
         handlePhoneNumberInput,
         stripSpecialChars,
         getGreeting,
-        isLinkActive,
         isFullPathActive,
         formatCurrency,
         useKeyboardShortcut,

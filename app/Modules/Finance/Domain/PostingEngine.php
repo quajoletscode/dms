@@ -2,9 +2,11 @@
 
 namespace App\Modules\Finance\Domain;
 
+use App\Modules\Finance\Models\FiscalPeriod;
 use App\Modules\Finance\Models\JournalEntry;
 use App\Modules\Finance\Models\JournalLine;
 use App\Support\DocumentNumberGenerator;
+use App\Support\Exceptions\PostingIntoClosedPeriodException;
 use App\Support\Exceptions\UnbalancedJournalException;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
@@ -23,22 +25,26 @@ final class PostingEngine
         private readonly DocumentNumberGenerator $numbers,
     ) {}
 
-    public function post(string $eventType, Model $document, ?string $memo = null): JournalEntry
+    public function post(string $eventType, Model $document, ?string $memo = null, ?string $date = null): JournalEntry
     {
         $rule = $this->rules->for($eventType);
         $lines = $rule->resolveLines($document);
 
         $this->assertBalanced($lines);
 
-        return DB::transaction(function () use ($document, $lines, $memo) {
+        $postingDate = $date ?? now()->toDateString();
+        $fiscalPeriod = $this->resolveOpenFiscalPeriod($postingDate);
+
+        return DB::transaction(function () use ($document, $lines, $memo, $postingDate, $fiscalPeriod) {
             $journal = JournalEntry::query()->create([
                 'no' => $this->numbers->next('journal', 'company'),
-                'date' => now()->toDateString(),
+                'date' => $postingDate,
                 'memo' => $memo,
                 'postable_type' => $document->getMorphClass(),
                 'postable_id' => $document->getKey(),
                 'posted_by' => Auth::id(),
                 'status' => 'posted',
+                'fiscal_period_id' => $fiscalPeriod?->id,
             ]);
 
             foreach ($lines as $line) {
@@ -56,6 +62,27 @@ final class PostingEngine
 
             return $journal;
         });
+    }
+
+    /**
+     * FIN-05: posting into a closed fiscal period is rejected. No fiscal
+     * period covering the date at all (the common case before Phase 6 seeds
+     * any) means unrestricted — periods are opt-in, not required.
+     */
+    private function resolveOpenFiscalPeriod(string $date): ?FiscalPeriod
+    {
+        $period = FiscalPeriod::query()
+            ->where('starts_on', '<=', $date)
+            ->where('ends_on', '>=', $date)
+            ->first();
+
+        if ($period !== null && ! $period->isOpen()) {
+            throw new PostingIntoClosedPeriodException(
+                "Cannot post on {$date}: fiscal period #{$period->id} ({$period->starts_on->toDateString()} to {$period->ends_on->toDateString()}) is closed."
+            );
+        }
+
+        return $period;
     }
 
     /**

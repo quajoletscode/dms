@@ -22,7 +22,11 @@ import { SearchIcon } from '@lucide/vue';
                   .default()
                   .map((group) => ({
                         ...group,
-                        items: group.items.filter((item) => !item.permission || can(item.permission)),
+                        items: group.items.filter(
+                              (item) =>
+                                    (!item.permission || can(item.permission)) &&
+                                    (!item.permissions || item.permissions.some((permission) => can(permission))),
+                        ),
                   }))
                   .filter((group) => group.items.length > 0);
       });
@@ -129,7 +133,7 @@ import { SearchIcon } from '@lucide/vue';
                               </li>
                               <li v-for="item in group.items" :key="item.name"
                                 class="animate-in fade-in slide-in-from-bottom-2">
-                                    <NavLink @toggle="emits('toggle')" :active="item.to === page.url" :name="item.name"
+                                    <NavLink @toggle="emits('toggle')" :name="item.name"
                                       :to="item.to" :icon="item.icon" :icon-size="item.iconSize"
                                       :class="item.classNames" />
                               </li>

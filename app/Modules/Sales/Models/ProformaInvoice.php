@@ -11,6 +11,7 @@ use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * SO-02: non-posting quotation document — no stock or accounting effect.
@@ -20,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $customer_id
  * @property int $warehouse_id
  * @property int|null $sales_order_id
- * @property \Illuminate\Support\Carbon $valid_until
+ * @property Carbon $valid_until
  * @property string $status
  * @property Money $subtotal
  * @property Money $tax_total
