@@ -1,10 +1,13 @@
-import { computed, toValue  } from 'vue';
-import type {MaybeRefOrGetter} from 'vue';
+import { computed, toValue } from 'vue';
+import type { MaybeRefOrGetter } from 'vue';
 
 type FilterValue = string | number | boolean | null | undefined;
 type Filters = Record<string, FilterValue>;
 
-export function useExportUrl(baseUrl: MaybeRefOrGetter<string>, filters: MaybeRefOrGetter<Filters>) {
+export function useExportUrl(
+    baseUrl: MaybeRefOrGetter<string>,
+    filters: MaybeRefOrGetter<Filters>,
+) {
     const buildUrl = (format: 'csv' | 'pdf') => {
         const base = toValue(baseUrl).replace(/\/$/, '');
         const filterValues = toValue(filters);

@@ -12,19 +12,35 @@ use App\Modules\Van\Http\Requests\StoreVanRequest;
 use App\Modules\Van\Models\VanStorage;
 use App\Modules\Warehouse\Models\Warehouse;
 use App\Support\AdjacentRecordResolver;
+use App\Support\ListPageProps;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class VanController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request, ListPageProps $listPageProps): Response
     {
         Gate::authorize('viewAny', VanStorage::class);
 
+        $sort = $listPageProps->resolveSort($request, ['code', 'vehicle_no', 'created_at'], 'code');
+        $direction = $listPageProps->resolveDirection($request);
+        $search = $request->string('q')->toString();
+
+        $paginator = VanStorage::query()
+            ->with(['warehouse', 'dsr'])
+            ->when($search !== '', fn ($query) => $query->where(fn ($q) => $q
+                ->where('code', 'like', "%{$search}%")
+                ->orWhere('vehicle_no', 'like', "%{$search}%")))
+            ->orderBy($sort, $direction)
+            ->paginate($listPageProps->resolvePerPage($request))
+            ->withQueryString();
+
         return Inertia::render('vans/Index', [
-            'vans' => VanStorage::query()->with(['warehouse', 'dsr'])->orderBy('code')->get(),
+            'vans' => $paginator->items(),
+            ...$listPageProps->build($paginator, $request),
         ]);
     }
 

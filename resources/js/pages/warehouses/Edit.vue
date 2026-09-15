@@ -47,7 +47,10 @@ const submit = () => {
         <ObjectPageHeader
             :title="warehouse.name"
             :back-href="index().url"
-            :status="{ label: warehouse.is_active ? 'Active' : 'Inactive', variant: warehouse.is_active ? 'success' : 'neutral' }"
+            :status="{
+                label: warehouse.is_active ? 'Active' : 'Inactive',
+                variant: warehouse.is_active ? 'success' : 'neutral',
+            }"
         />
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-[12rem_1fr]">
@@ -56,13 +59,35 @@ const submit = () => {
             <form class="space-y-6" @submit.prevent="submit">
                 <ObjectPageSection id="details" title="Details">
                     <div class="space-y-4">
-                        <TextInput label="Code" required v-model="form.code" :error="form.errors.code" :disabled="form.processing" />
-                        <TextInput label="Name" required v-model="form.name" :error="form.errors.name" :disabled="form.processing" />
-                        <TextInput label="Location" v-model="form.location" :error="form.errors.location" :disabled="form.processing" />
+                        <TextInput
+                            label="Code"
+                            required
+                            v-model="form.code"
+                            :error="form.errors.code"
+                            :disabled="form.processing"
+                        />
+                        <TextInput
+                            label="Name"
+                            required
+                            v-model="form.name"
+                            :error="form.errors.name"
+                            :disabled="form.processing"
+                        />
+                        <TextInput
+                            label="Location"
+                            v-model="form.location"
+                            :error="form.errors.location"
+                            :disabled="form.processing"
+                        />
                         <SelectList
                             label="Manager"
                             v-model="form.manager_id"
-                            :options="props.managers.map((m) => ({ label: m.name, value: m.id }))"
+                            :options="
+                                props.managers.map((m) => ({
+                                    label: m.name,
+                                    value: m.id,
+                                }))
+                            "
                             placeholder="No manager assigned"
                             :error="form.errors.manager_id"
                             :disabled="form.processing"
@@ -74,9 +99,19 @@ const submit = () => {
                     <CheckToggler v-model="form.is_active" label="Active" />
 
                     <template #footer>
-                        <Link :href="index().url" class="button ghost">Cancel</Link>
-                        <Button type="submit" class="flex items-center gap-2" :disabled="form.processing">
-                            <Loader2Icon :size="18" class="animate-spin" v-if="form.processing" />
+                        <Link :href="index().url" class="button ghost"
+                            >Cancel</Link
+                        >
+                        <Button
+                            type="submit"
+                            class="flex items-center gap-2"
+                            :disabled="form.processing"
+                        >
+                            <Loader2Icon
+                                :size="18"
+                                class="animate-spin"
+                                v-if="form.processing"
+                            />
                             <SaveIcon :size="18" v-else />
                             Save
                         </Button>

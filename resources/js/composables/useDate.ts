@@ -217,8 +217,11 @@ export const dateGroupLabel = (date: Date | string) => {
         date = new Date(date);
     }
 
-    const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const diffDays = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86400000);
+    const startOfDay = (d: Date) =>
+        new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diffDays = Math.round(
+        (startOfDay(new Date()) - startOfDay(date)) / 86400000,
+    );
 
     if (diffDays === 0) {
         return 'Today';

@@ -10,19 +10,35 @@ use App\Modules\Warehouse\Http\Requests\StoreWarehouseRequest;
 use App\Modules\Warehouse\Http\Requests\UpdateWarehouseRequest;
 use App\Modules\Warehouse\Models\Warehouse;
 use App\Support\AdjacentRecordResolver;
+use App\Support\ListPageProps;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class WarehouseController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request, ListPageProps $listPageProps): Response
     {
         Gate::authorize('viewAny', Warehouse::class);
 
+        $sort = $listPageProps->resolveSort($request, ['name', 'code', 'created_at'], 'name');
+        $direction = $listPageProps->resolveDirection($request);
+        $search = $request->string('q')->toString();
+
+        $paginator = Warehouse::query()
+            ->with('manager')
+            ->when($search !== '', fn ($query) => $query->where(fn ($q) => $q
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('code', 'like', "%{$search}%")))
+            ->orderBy($sort, $direction)
+            ->paginate($listPageProps->resolvePerPage($request))
+            ->withQueryString();
+
         return Inertia::render('warehouses/Index', [
-            'warehouses' => Warehouse::query()->with('manager')->orderBy('name')->get(),
+            'warehouses' => $paginator->items(),
+            ...$listPageProps->build($paginator, $request),
         ]);
     }
 

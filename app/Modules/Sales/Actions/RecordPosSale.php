@@ -4,7 +4,6 @@ namespace App\Modules\Sales\Actions;
 
 use App\Modules\Finance\Domain\PostingEngine;
 use App\Modules\MasterData\Models\Customer;
-use App\Modules\MasterData\Models\Product;
 use App\Modules\Sales\Domain\CustomerCreditLimitCheck;
 use App\Modules\Sales\Domain\Exceptions\CreditLimitExceededException;
 use App\Modules\Sales\Domain\Exceptions\DiscountOverrideRequiredException;
@@ -14,7 +13,7 @@ use App\Modules\Sales\Models\Invoice;
 use App\Modules\Sales\Models\TillSession;
 use App\Support\DocumentNumberGenerator;
 use App\Support\Money;
-use App\Support\Quantity;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -26,6 +25,8 @@ use Illuminate\Support\Facades\Gate;
  * ConvertToInvoice, the credit-limit check nets out payments collected in
  * the same transaction: a walk-in cash sale against a credit_limit=0
  * customer never blocks as long as it's paid in full at the till.
+ *
+ * @phpstan-import-type ComposedLine from InvoiceLineComposer
  */
 final class RecordPosSale
 {
@@ -38,14 +39,14 @@ final class RecordPosSale
     ) {}
 
     /**
-     * @param  list<array{product_id:int, qty:string, unit_price:string, discount:string}>  $items
+     * @param  list<array{product_id:int, qty:string, unit_price:string, discount:string, service_date?:string|null, vehicle_no?:string|null, line_description?:string|null}>  $items
      * @param  list<array{method:string, amount:string, reference?:string}>  $payments
      */
-    public function execute(int $tillSessionId, int $customerId, array $items, array $payments): Invoice
+    public function execute(int $tillSessionId, int $customerId, array $items, array $payments, ?string $saleDate = null): Invoice
     {
         Gate::authorize('sales.pos');
 
-        return DB::transaction(function () use ($tillSessionId, $customerId, $items, $payments) {
+        return DB::transaction(function () use ($tillSessionId, $customerId, $items, $payments, $saleDate) {
             $tillSession = TillSession::query()->whereKey($tillSessionId)->firstOrFail();
 
             if ($tillSession->status !== 'open') {
@@ -71,6 +72,8 @@ final class RecordPosSale
                 );
             }
 
+            $saleDateString = Carbon::parse($saleDate ?? now())->toDateString();
+
             $invoice = Invoice::query()->create([
                 'no' => $this->numbers->next('invoice', 'warehouse', $tillSession->warehouse_id),
                 'source' => 'pos',
@@ -79,6 +82,8 @@ final class RecordPosSale
                 'sales_order_id' => null,
                 'proforma_invoice_id' => null,
                 'due_date' => null,
+                'invoice_date' => $saleDateString,
+                'posting_date' => $saleDateString,
                 'status' => 'unpaid',
                 'created_by' => Auth::id(),
                 'subtotal' => $computation['subtotal']->minorUnits,
@@ -89,7 +94,7 @@ final class RecordPosSale
 
             $this->lineComposer->persist($invoice, 'warehouse', $tillSession->warehouse_id, $computation['lines']);
 
-            $this->postingEngine->post('invoice.issued', $invoice->load('items'));
+            $this->postingEngine->post('invoice.issued', $invoice->load('items'), date: $saleDateString);
 
             foreach ($payments as $payment) {
                 $this->recordPayment->execute(
@@ -107,7 +112,7 @@ final class RecordPosSale
     }
 
     /**
-     * @param  list<array{product: Product, qty: Quantity, unit_price: Money, discount: Money, tax_rate: string, tax: Money}>  $lines
+     * @param  list<ComposedLine>  $lines
      */
     private function assertDiscountsWithinThreshold(array $lines): void
     {
@@ -128,7 +133,7 @@ final class RecordPosSale
 
             if ($discountRatePercent > $thresholdPercent && ! (Auth::user()?->can('pos.discount_override') ?? false)) {
                 throw new DiscountOverrideRequiredException(
-                    "Line discount of {$discountRatePercent}% on product #{$line['product']->id} exceeds the {$thresholdPercent}% threshold; pos.discount_override permission required."
+                    "Line discount of {$discountRatePercent}% on product #{$line['product']?->id} exceeds the {$thresholdPercent}% threshold; pos.discount_override permission required."
                 );
             }
         }

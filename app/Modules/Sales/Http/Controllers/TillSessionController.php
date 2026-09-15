@@ -15,7 +15,9 @@ use App\Modules\Sales\Models\TillSession;
 use App\Modules\Warehouse\Domain\WarehouseScope;
 use App\Modules\Warehouse\Models\Warehouse;
 use App\Support\Exceptions\IllegalTransitionException;
+use App\Support\ListPageProps;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -23,24 +25,36 @@ use Inertia\Response;
 
 class TillSessionController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request, ListPageProps $listPageProps): Response
     {
         Gate::authorize('viewAny', TillSession::class);
 
+        $sort = $listPageProps->resolveSort($request, ['opened_at', 'status'], 'opened_at');
+        $direction = $listPageProps->resolveDirection($request, 'desc');
+        $search = $request->string('q')->toString();
+
+        $paginator = TillSession::query()
+            ->where('user_id', Auth::id())
+            ->with('warehouse')
+            ->when($search !== '', fn ($query) => $query->whereHas(
+                'warehouse',
+                fn ($warehouseQuery) => $warehouseQuery->where('name', 'like', "%{$search}%"),
+            ))
+            ->orderBy($sort, $direction)
+            ->paginate($listPageProps->resolvePerPage($request))
+            ->withQueryString()
+            ->through(fn (TillSession $session) => [
+                'id' => $session->id,
+                'status' => $session->status,
+                'warehouse' => $session->warehouse->only(['id', 'name']),
+                'opening_float' => $session->opening_float->toMajor(),
+                'opened_at' => $session->opened_at->toIso8601String(),
+                'closed_at' => $session->closed_at?->toIso8601String(),
+            ]);
+
         return Inertia::render('sales/till-sessions/Index', [
-            'tillSessions' => TillSession::query()
-                ->where('user_id', Auth::id())
-                ->with('warehouse')
-                ->latest('opened_at')
-                ->get()
-                ->map(fn (TillSession $session) => [
-                    'id' => $session->id,
-                    'status' => $session->status,
-                    'warehouse' => $session->warehouse->only(['id', 'name']),
-                    'opening_float' => $session->opening_float->toMajor(),
-                    'opened_at' => $session->opened_at->toIso8601String(),
-                    'closed_at' => $session->closed_at?->toIso8601String(),
-                ]),
+            'tillSessions' => $paginator->items(),
+            ...$listPageProps->build($paginator, $request),
         ]);
     }
 

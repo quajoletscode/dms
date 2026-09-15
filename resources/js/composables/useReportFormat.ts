@@ -1,7 +1,10 @@
 import { formatAmount, formatNumber } from '@/composables/useApp';
 import type { ReportValueFormat } from '@/types/reports';
 
-export function formatReportValue(value: number | null | undefined, format: ReportValueFormat | string): string {
+export function formatReportValue(
+    value: number | null | undefined,
+    format: ReportValueFormat | string,
+): string {
     if (value === null || value === undefined) {
         return '—';
     }

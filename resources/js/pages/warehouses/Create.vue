@@ -31,13 +31,35 @@ const submit = () => {
         <form @submit.prevent="submit">
             <ObjectPageSection id="details" title="Details">
                 <div class="space-y-4">
-                    <TextInput label="Code" required v-model="form.code" :error="form.errors.code" :disabled="form.processing" />
-                    <TextInput label="Name" required v-model="form.name" :error="form.errors.name" :disabled="form.processing" />
-                    <TextInput label="Location" v-model="form.location" :error="form.errors.location" :disabled="form.processing" />
+                    <TextInput
+                        label="Code"
+                        required
+                        v-model="form.code"
+                        :error="form.errors.code"
+                        :disabled="form.processing"
+                    />
+                    <TextInput
+                        label="Name"
+                        required
+                        v-model="form.name"
+                        :error="form.errors.name"
+                        :disabled="form.processing"
+                    />
+                    <TextInput
+                        label="Location"
+                        v-model="form.location"
+                        :error="form.errors.location"
+                        :disabled="form.processing"
+                    />
                     <SelectList
                         label="Manager"
                         v-model="form.manager_id"
-                        :options="props.managers.map((m) => ({ label: m.name, value: m.id }))"
+                        :options="
+                            props.managers.map((m) => ({
+                                label: m.name,
+                                value: m.id,
+                            }))
+                        "
                         placeholder="No manager assigned"
                         :error="form.errors.manager_id"
                         :disabled="form.processing"
@@ -46,8 +68,16 @@ const submit = () => {
 
                 <template #footer>
                     <Link :href="index().url" class="button ghost">Cancel</Link>
-                    <Button type="submit" class="flex items-center gap-2" :disabled="form.processing">
-                        <Loader2Icon :size="18" class="animate-spin" v-if="form.processing" />
+                    <Button
+                        type="submit"
+                        class="flex items-center gap-2"
+                        :disabled="form.processing"
+                    >
+                        <Loader2Icon
+                            :size="18"
+                            class="animate-spin"
+                            v-if="form.processing"
+                        />
                         <SaveIcon :size="18" v-else />
                         Save
                     </Button>

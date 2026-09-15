@@ -10,7 +10,12 @@ export default defineConfig({
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.ts'],
-            refresh: true,
+            refresh: [
+                'app/**/*.php',
+                'config/**/*.php',
+                'routes/**/*.php',
+                'resources/views/**/*.php',
+            ],
             fonts: [
                 bunny('Instrument Sans', {
                     weights: [400, 500, 600],
@@ -18,7 +23,7 @@ export default defineConfig({
             ],
         }),
         inertia({
-            ssr: true
+            ssr: true,
         }),
         tailwindcss(),
         vue({
@@ -33,4 +38,14 @@ export default defineConfig({
             formVariants: true,
         }),
     ],
+    server: {
+        watch: {
+            ignored: [
+                '**/storage/**',
+                '**/database/**',
+                '**/bootstrap/cache/**',
+                '**/laravel',
+            ],
+        },
+    },
 });

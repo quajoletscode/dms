@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $price_category
  * @property int|null $coa_account_id
  * @property string|null $rims_tenant_code
+ * @property array<int, array<string, string|null>>|null $driver_vehicle_profiles
  * @property bool $is_active
  */
 class Customer extends Model
@@ -33,6 +34,7 @@ class Customer extends Model
     {
         return [
             'credit_limit' => MoneyCast::class,
+            'driver_vehicle_profiles' => 'array',
             'is_active' => 'boolean',
         ];
     }

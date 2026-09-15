@@ -11,6 +11,7 @@ use App\Modules\Sales\Models\Invoice;
 use App\Modules\Van\Models\VanStorage;
 use App\Support\DocumentNumberGenerator;
 use App\Support\Money;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -35,14 +36,14 @@ final class RecordVanSale
     ) {}
 
     /**
-     * @param  list<array{product_id:int, qty:string, unit_price:string, discount:string}>  $items
+     * @param  list<array{product_id:int, qty:string, unit_price:string, discount:string, service_date?:string|null, vehicle_no?:string|null, line_description?:string|null}>  $items
      * @param  list<array{method:string, amount:string, reference?:string}>  $payments
      */
-    public function execute(int $vanStorageId, int $customerId, array $items, array $payments): Invoice
+    public function execute(int $vanStorageId, int $customerId, array $items, array $payments, ?string $saleDate = null): Invoice
     {
         Gate::authorize('van.sale');
 
-        return DB::transaction(function () use ($vanStorageId, $customerId, $items, $payments) {
+        return DB::transaction(function () use ($vanStorageId, $customerId, $items, $payments, $saleDate) {
             $van = VanStorage::query()->whereKey($vanStorageId)->firstOrFail();
             $customer = Customer::query()->whereKey($customerId)->firstOrFail();
             $computation = $this->lineComposer->compute($items);
@@ -61,6 +62,8 @@ final class RecordVanSale
                 );
             }
 
+            $saleDateString = Carbon::parse($saleDate ?? now())->toDateString();
+
             $invoice = Invoice::query()->create([
                 'no' => $this->numbers->next('invoice', 'warehouse', $van->warehouse_id),
                 'source' => 'van',
@@ -70,6 +73,8 @@ final class RecordVanSale
                 'sales_order_id' => null,
                 'proforma_invoice_id' => null,
                 'due_date' => null,
+                'invoice_date' => $saleDateString,
+                'posting_date' => $saleDateString,
                 'status' => 'unpaid',
                 'created_by' => Auth::id(),
                 'subtotal' => $computation['subtotal']->minorUnits,
@@ -80,7 +85,7 @@ final class RecordVanSale
 
             $this->lineComposer->persist($invoice, 'van', $van->id, $computation['lines']);
 
-            $this->postingEngine->post('invoice.issued', $invoice->load('items'));
+            $this->postingEngine->post('invoice.issued', $invoice->load('items'), date: $saleDateString);
 
             foreach ($payments as $payment) {
                 $this->recordPayment->execute(

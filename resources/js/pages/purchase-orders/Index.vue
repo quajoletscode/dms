@@ -1,11 +1,11 @@
 <script lang="ts" setup>
 import { Link } from '@inertiajs/vue3';
 import { EyeIcon, PlusIcon } from '@lucide/vue';
-import BaseTable from '@/components/DataTable/BaseTable.vue';
+import DataTable from '@/components/DataTable/DataTable.vue';
 import Badge, { type Variant } from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
 import { create, show } from '@/routes/purchase-orders';
-import type { ColumnDef } from '@/types';
+import type { ColumnDef, SimplePaginationMeta } from '@/types';
 
 interface PurchaseOrder {
     id: number;
@@ -18,9 +18,17 @@ interface PurchaseOrder {
 
 defineProps<{
     purchaseOrders: PurchaseOrder[];
+    meta?: SimplePaginationMeta;
 }>();
 
-const thead: ColumnDef[] = ['No.', 'Supplier', 'Warehouse', 'Status', 'Total (GHS)', 'Actions'];
+const thead: ColumnDef[] = [
+    { label: 'No.', key: 'no' },
+    'Supplier',
+    'Warehouse',
+    { label: 'Status', key: 'status' },
+    { label: 'Total (GHS)', key: 'grand_total' },
+    'Actions',
+];
 
 const statusVariant: Record<string, Variant> = {
     draft: 'neutral',
@@ -37,8 +45,14 @@ const statusVariant: Record<string, Variant> = {
     <div class="space-y-6 py-4">
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Purchase Orders</h1>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Orders raised against suppliers.</p>
+                <h1
+                    class="text-2xl font-bold text-slate-900 dark:text-slate-100"
+                >
+                    Purchase Orders
+                </h1>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Orders raised against suppliers.
+                </p>
             </div>
             <Link :href="create().url">
                 <Button class="flex items-center gap-2">
@@ -48,25 +62,48 @@ const statusVariant: Record<string, Variant> = {
             </Link>
         </div>
 
-        <BaseTable :thead="thead">
-            <tr v-for="po in purchaseOrders" :key="po.id" class="border-b border-slate-200 dark:border-slate-700">
-                <td class="px-3 py-2 font-mono text-sm">{{ po.no }}</td>
-                <td class="px-3 py-2">{{ po.supplier.name }}</td>
-                <td class="px-3 py-2">{{ po.warehouse.name }}</td>
-                <td class="px-3 py-2">
-                    <Badge :variant="statusVariant[po.status] ?? 'neutral'">{{ po.status.replace('_', ' ') }}</Badge>
-                </td>
-                <td class="px-3 py-2 tabular-nums">{{ po.grand_total }}</td>
-                <td class="px-3 py-2">
-                    <Link :href="show(po.id).url" title="View purchase order">
-                        <EyeIcon :size="18" class="text-slate-400 hover:text-primary-light" />
-                    </Link>
-                </td>
-            </tr>
-
-            <template #empty>
-                <span class="font-medium text-gray-400">No purchase orders yet.</span>
+        <DataTable
+            :items="purchaseOrders"
+            :thead="thead"
+            :is-loading="false"
+            :meta="meta"
+            :only="['purchaseOrders', 'meta', 'request']"
+            search-placeholder="Search purchase orders..."
+        >
+            <template #default="{ items }">
+                <tr
+                    v-for="po in items"
+                    :key="po.id"
+                    class="border-b border-slate-200 dark:border-slate-700"
+                >
+                    <td class="px-3 py-2 font-mono text-sm">{{ po.no }}</td>
+                    <td class="px-3 py-2">{{ po.supplier.name }}</td>
+                    <td class="px-3 py-2">{{ po.warehouse.name }}</td>
+                    <td class="px-3 py-2">
+                        <Badge :variant="statusVariant[po.status] ?? 'neutral'">{{
+                            po.status.replace('_', ' ')
+                        }}</Badge>
+                    </td>
+                    <td class="px-3 py-2 tabular-nums">{{ po.grand_total }}</td>
+                    <td class="px-3 py-2">
+                        <Link
+                            :href="show(po.id).url"
+                            title="View purchase order"
+                        >
+                            <EyeIcon
+                                :size="18"
+                                class="hover:text-primary-light text-slate-400"
+                            />
+                        </Link>
+                    </td>
+                </tr>
             </template>
-        </BaseTable>
+
+            <template #empty-state>
+                <span class="font-medium text-gray-400"
+                    >No purchase orders yet.</span
+                >
+            </template>
+        </DataTable>
     </div>
 </template>

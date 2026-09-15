@@ -1,95 +1,85 @@
 <script setup lang="ts">
-      import { Link, usePage } from '@inertiajs/vue3';
-      import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
-      import type { HTMLAttributes } from 'vue';
-      import TextInput from '@/components/ui/inputs/TextInput.vue';
-      import Time from '@/components/Time.vue';
-      import { usePermissions } from '@/composables/usePermission';
-      import { roleMenus } from '../../../types/navigation';
-      import type { NavItem } from '../../../types/navigation';
-      import NavLinkGroup from '@/components/NavLinkGroup.vue';
-      import NavLink from '@/components/NavLink.vue';
+import { Link, usePage } from '@inertiajs/vue3';
 import { SearchIcon } from '@lucide/vue';
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
+import type { HTMLAttributes } from 'vue';
+import NavLink from '@/components/NavLink.vue';
+import NavLinkGroup from '@/components/NavLinkGroup.vue';
+import Time from '@/components/Time.vue';
+import TextInput from '@/components/ui/inputs/TextInput.vue';
+import { useNavigationCommands } from '@/composables/useNavigationCommands';
 
-      const page = usePage();
+const page = usePage();
 
-      const { can } = usePermissions();
+const { navigationGroups } = useNavigationCommands();
 
-      const searchKey = ref('');
+const searchKey = ref('');
 
-      const items = computed<NavItem[]>(() => {
-            return roleMenus
-                  .default()
-                  .map((group) => ({
-                        ...group,
-                        items: group.items.filter(
-                              (item) =>
-                                    (!item.permission || can(item.permission)) &&
-                                    (!item.permissions || item.permissions.some((permission) => can(permission))),
-                        ),
-                  }))
-                  .filter((group) => group.items.length > 0);
-      });
+const filteredItems = computed(() => {
+    if (!searchKey.value) {
+        return navigationGroups.value;
+    }
 
-      const filteredItems = computed(() => {
+    const query = searchKey.value.toLowerCase();
 
-            if (!searchKey.value) {
-                  return items.value;
+    return navigationGroups.value
+        .map((group) => ({
+            ...group,
+            items: group.items.filter((item) =>
+                item.name.toLowerCase().includes(query),
+            ),
+        }))
+        .filter((group) => group.items.length > 0);
+});
+
+const props = defineProps<{
+    class?: HTMLAttributes['class'];
+    isOpen: boolean;
+}>();
+
+const computedClass = computed(() => {
+    return props.isOpen === true ? 'translate-x-0' : '';
+});
+
+const emits = defineEmits(['toggle']);
+
+const ul = useTemplateRef('nav-ul');
+
+watch(
+    () => page.url,
+    async () => {
+        await nextTick();
+
+        if (ul.value) {
+            const currentActiveLink = ul.value.querySelector('a.link-active');
+
+            if (currentActiveLink) {
+                currentActiveLink.scrollIntoView({
+                    behavior: 'instant',
+                    block: 'center',
+                    inline: 'center',
+                });
             }
+        }
+    },
+    {
+        immediate: true,
+    },
+);
 
-            const query = searchKey.value.toLowerCase();
-
-            return items.value
-                  .map((group) => ({
-                        ...group,
-                        items: group.items.filter((item) => item.name.toLowerCase().includes(query)),
-                  }))
-                  .filter((group) => group.items.length > 0);
-      });
-      const props = defineProps<{
-            class?: HTMLAttributes['class'],
-            isOpen: boolean
-      }>();
-
-      const computedClass = computed(() => {
-            return props.isOpen === true ? 'translate-x-0' : '';
-      });
-
-      const emits = defineEmits(['toggle']);
-
-      const ul = useTemplateRef('nav-ul');
-
-
-      watch(() => page.url, async () => {
-
-            await nextTick();
-
-            if (ul.value) {
-                  const currentActiveLink = ul.value.querySelector('a.link-active');
-
-                  if (currentActiveLink) {
-                        currentActiveLink.scrollIntoView({
-                              behavior: 'instant',
-                              block: 'center',
-                              inline: 'center',
-                        })
-                  }
-            }
-      }, {
-            immediate: true, // run immediately to handle the initial page load
-      });
-
-      watch(() => props.isOpen, (open) => {
-            if (open) {
-                  document.body.classList.add('overflow-y-hidden')
-            } else {
-                  if (typeof window !== 'undefined') {
-                        document.body.classList.remove('overflow-y-hidden')
-                  }
-            }
-      }, {
-            immediate: true
-      });
+watch(
+    () => props.isOpen,
+    (open) => {
+        if (open) {
+            document.body.classList.add('overflow-y-hidden');
+        } else if (typeof window !== 'undefined') {
+            document.body.classList.remove('overflow-y-hidden');
+        }
+    },
+    {
+        immediate: true,
+    },
+);
 </script>
 
 <template>
@@ -102,7 +92,7 @@ import { SearchIcon } from '@lucide/vue';
             </Transition>
       </Teleport>
       <aside :class="[
-            'h-full lg:z-45 p-2 w-full max-w-xs fixed top-0 z-124 dark:text-gray-100 bg-slate-50 dark:bg-slate-900 transition ease-in duration-150 border-r border-gray-300 dark:border-gray-700 print:hidden -translate-x-full lg:translate-x-0',
+            'h-full lg:hidden p-2 w-full max-w-xs fixed top-0 z-124 dark:text-gray-100 bg-slate-50 dark:bg-slate-900 transition ease-in duration-150 border-r border-gray-300 dark:border-gray-700 print:hidden -translate-x-full',
             computedClass,
             props.class,
       ]">

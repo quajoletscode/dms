@@ -8,8 +8,10 @@ use App\Modules\Sales\Http\Requests\RecordInvoicePaymentRequest;
 use App\Modules\Sales\Models\Invoice;
 use App\Modules\Warehouse\Domain\WarehouseScope;
 use App\Support\AdjacentRecordResolver;
+use App\Support\ListPageProps;
 use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -17,27 +19,39 @@ use Inertia\Response;
 
 class InvoiceController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request, ListPageProps $listPageProps): Response
     {
         Gate::authorize('viewAny', Invoice::class);
 
         $user = Auth::user();
         $canViewAll = $user->can('invoice.create') || $user->can('invoice.payment.record');
 
+        $sort = $listPageProps->resolveSort($request, ['no', 'status', 'grand_total', 'invoice_date', 'created_at'], 'created_at');
+        $direction = $listPageProps->resolveDirection($request, 'desc');
+        $search = $request->string('q')->toString();
+
+        $paginator = Invoice::query()
+            ->when(! $canViewAll, fn ($query) => $query->where('created_by', $user->id))
+            ->with('customer')
+            ->when($search !== '', fn ($query) => $query->where(fn ($q) => $q
+                ->where('no', 'like', "%{$search}%")
+                ->orWhereHas('customer', fn ($customerQuery) => $customerQuery->where('name', 'like', "%{$search}%"))))
+            ->orderBy($sort, $direction)
+            ->paginate($listPageProps->resolvePerPage($request))
+            ->withQueryString()
+            ->through(fn (Invoice $invoice) => [
+                'id' => $invoice->id,
+                'no' => $invoice->no,
+                'source' => $invoice->source,
+                'status' => $invoice->status,
+                'invoice_date' => $invoice->invoice_date?->toDateString(),
+                'grand_total' => $invoice->grand_total->toMajor(),
+                'customer' => $invoice->customer->only(['id', 'name']),
+            ]);
+
         return Inertia::render('sales/invoices/Index', [
-            'invoices' => Invoice::query()
-                ->when(! $canViewAll, fn ($query) => $query->where('created_by', $user->id))
-                ->with('customer')
-                ->latest()
-                ->get()
-                ->map(fn (Invoice $invoice) => [
-                    'id' => $invoice->id,
-                    'no' => $invoice->no,
-                    'source' => $invoice->source,
-                    'status' => $invoice->status,
-                    'grand_total' => $invoice->grand_total->toMajor(),
-                    'customer' => $invoice->customer->only(['id', 'name']),
-                ]),
+            'invoices' => $paginator->items(),
+            ...$listPageProps->build($paginator, $request),
         ]);
     }
 
@@ -53,6 +67,7 @@ class InvoiceController extends Controller
             'customer',
             'warehouse' => fn ($query) => $query->withoutGlobalScope(WarehouseScope::class),
             'items.product',
+            'items.glAccount',
             'payments.receivedBy',
         ]);
 
@@ -63,6 +78,8 @@ class InvoiceController extends Controller
                 'source' => $invoice->source,
                 'status' => $invoice->status,
                 'due_date' => $invoice->due_date?->toDateString(),
+                'invoice_date' => $invoice->invoice_date?->toDateString(),
+                'posting_date' => $invoice->posting_date?->toDateString(),
                 'subtotal' => $invoice->subtotal->toMajor(),
                 'tax_total' => $invoice->tax_total->toMajor(),
                 'discount_total' => $invoice->discount_total->toMajor(),
@@ -71,7 +88,12 @@ class InvoiceController extends Controller
                 'warehouse' => $invoice->warehouse->only(['id', 'name']),
                 'items' => $invoice->items->map(fn ($item) => [
                     'id' => $item->id,
-                    'product' => $item->product->only(['id', 'sku', 'name']),
+                    'line_type' => $item->line_type,
+                    'product' => $item->product?->only(['id', 'sku', 'name']),
+                    'gl_account' => $item->glAccount?->only(['id', 'code', 'name']),
+                    'service_date' => $item->service_date?->toDateString(),
+                    'vehicle_no' => $item->vehicle_no,
+                    'line_description' => $item->line_description,
                     'qty' => (string) $item->qty,
                     'unit_price' => $item->unit_price->toMajor(),
                     'discount' => $item->discount->toMajor(),

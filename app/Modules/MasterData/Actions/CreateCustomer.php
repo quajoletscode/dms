@@ -20,6 +20,7 @@ final class CreateCustomer
             'price_category' => $data['price_category'] ?? null,
             'coa_account_id' => $data['coa_account_id'] ?? null,
             'rims_tenant_code' => $data['rims_tenant_code'] ?? null,
+            'driver_vehicle_profiles' => $data['driver_vehicle_profiles'] ?? [],
             'is_active' => true,
         ]);
     }

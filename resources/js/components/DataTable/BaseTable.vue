@@ -1,38 +1,44 @@
 <script setup lang="ts">
-    import { ChevronDownIcon, ChevronUpIcon, ChevronsUpDownIcon } from '@lucide/vue';
-    import type { ColumnDef } from '@/types';
+import {
+    ChevronDownIcon,
+    ChevronUpIcon,
+    ChevronsUpDownIcon,
+} from '@lucide/vue';
+import type { ColumnDef } from '@/types';
 
-    const props = defineProps<{
-        thead: ColumnDef[];
-        sort?: string | null;
-        direction?: 'asc' | 'desc' | null;
-        /**
-         * Pins the last column (typically "Actions") to the right edge of the
-         * horizontally-scrolling table so it stays visible on narrow viewports
-         * instead of scrolling off-screen with no indication more columns exist.
-         * The consuming page must add matching sticky classes to its own last <td>
-         * (BaseTable only controls the auto-generated <th> row).
-         */
-        stickyLastColumn?: boolean;
-    }>();
+const props = defineProps<{
+    thead: ColumnDef[];
+    sort?: string | null;
+    direction?: 'asc' | 'desc' | null;
+    /**
+     * Pins the last column (typically "Actions") to the right edge of the
+     * horizontally-scrolling table so it stays visible on narrow viewports
+     * instead of scrolling off-screen with no indication more columns exist.
+     * The consuming page must add matching sticky classes to its own last <td>
+     * (BaseTable only controls the auto-generated <th> row).
+     */
+    stickyLastColumn?: boolean;
+}>();
 
-    const emit = defineEmits<{
-        sort: [key: string];
-    }>();
+const emit = defineEmits<{
+    sort: [key: string];
+}>();
 
-    const colLabel = (col: ColumnDef) => (typeof col === 'string' ? col : col.label);
-    const colKey = (col: ColumnDef) => (typeof col === 'string' ? null : col.key);
-    const isSortable = (col: ColumnDef): col is { label: string; key: string } => typeof col !== 'string';
+const colLabel = (col: ColumnDef) =>
+    typeof col === 'string' ? col : col.label;
+const colKey = (col: ColumnDef) => (typeof col === 'string' ? null : col.key);
+const isSortable = (col: ColumnDef): col is { label: string; key: string } =>
+    typeof col !== 'string';
 
-    const colState = (col: ColumnDef) => {
-        const k = colKey(col);
+const colState = (col: ColumnDef) => {
+    const k = colKey(col);
 
-        if (!k || props.sort !== k) {
-return 'none';
-}
+    if (!k || props.sort !== k) {
+        return 'none';
+    }
 
-        return props.direction ?? 'none';
-    };
+    return props.direction ?? 'none';
+};
 </script>
 
 <template>
@@ -47,17 +53,24 @@ return 'none';
                         :class="[
                             'text-left',
                             isSortable(col)
-                                ? 'cursor-pointer select-none group/th transition-colors hover:bg-slate-100 dark:hover:bg-slate-800'
+                                ? 'group/th cursor-pointer transition-colors select-none hover:bg-slate-100 dark:hover:bg-slate-800'
                                 : '',
                             stickyLastColumn && i === props.thead.length - 1
                                 ? 'sticky right-0 z-10 bg-slate-300 dark:bg-slate-800'
                                 : '',
                         ]"
-                        @click="isSortable(col) ? emit('sort', colKey(col)!) : undefined"
+                        @click="
+                            isSortable(col)
+                                ? emit('sort', colKey(col)!)
+                                : undefined
+                        "
                     >
                         <div class="flex items-center gap-1">
                             <span>{{ colLabel(col) }}</span>
-                            <span v-if="isSortable(col)" class="inline-flex flex-shrink-0">
+                            <span
+                                v-if="isSortable(col)"
+                                class="inline-flex flex-shrink-0"
+                            >
                                 <ChevronUpIcon
                                     v-if="colState(col) === 'asc'"
                                     :size="13"
@@ -82,7 +95,10 @@ return 'none';
                 <slot />
             </tbody>
         </table>
-        <div v-if="$slots.empty" class="bg-slate-50 p-6 text-center italic dark:bg-slate-950">
+        <div
+            v-if="$slots.empty"
+            class="bg-slate-50 p-6 text-center italic dark:bg-slate-950"
+        >
             <slot name="empty" />
         </div>
     </div>

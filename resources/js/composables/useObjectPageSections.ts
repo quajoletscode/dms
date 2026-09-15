@@ -22,7 +22,10 @@ export function useObjectPageSections(sections: () => ObjectPageSectionDef[]) {
             (entries) => {
                 const visible = entries
                     .filter((entry) => entry.isIntersecting)
-                    .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+                    .sort(
+                        (a, b) =>
+                            a.boundingClientRect.top - b.boundingClientRect.top,
+                    );
 
                 if (visible[0]) {
                     activeId.value = visible[0].target.id;
@@ -45,7 +48,9 @@ export function useObjectPageSections(sections: () => ObjectPageSectionDef[]) {
     });
 
     function scrollTo(id: string) {
-        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const el = document.getElementById(id);
+        el?.dispatchEvent(new CustomEvent('objectpage-expand'));
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         activeId.value = id;
     }
 

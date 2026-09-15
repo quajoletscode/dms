@@ -7,6 +7,7 @@ use App\Modules\Finance\Domain\Contracts\PostingRule;
 use App\Modules\Finance\Domain\JournalLineData;
 use App\Modules\MasterData\Models\Customer;
 use App\Modules\Sales\Models\Invoice;
+use App\Modules\Sales\Models\InvoiceItem;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
@@ -15,6 +16,11 @@ use InvalidArgumentException;
  * SO-03: converting to an invoice posts Dr Accounts Receivable (Customer) /
  * Cr Sales Revenue, plus Dr COGS / Cr Inventory — one compound journal, four
  * lines, for the single business event of issuing the invoice.
+ *
+ * A `gl_account` line (a non-stock charge) credits its own target account
+ * directly instead of Sales Revenue — everything else (`item`/`comment`
+ * lines) still nets to Sales Revenue exactly as before, so an invoice made
+ * entirely of `item` lines posts identically to pre-line-type behavior.
  */
 final class InvoicePostingRule implements PostingRule
 {
@@ -31,10 +37,30 @@ final class InvoicePostingRule implements PostingRule
             Money::zero(),
         );
 
+        $lineNetAmount = fn (InvoiceItem $item): Money => $item->unit_price
+            ->multiply((string) $item->qty)
+            ->subtract($item->discount)
+            ->add($item->tax);
+
+        $revenueTotal = $document->items
+            ->whereIn('line_type', ['item', 'comment'])
+            ->reduce(fn (Money $carry, InvoiceItem $item) => $carry->add($lineNetAmount($item)), Money::zero());
+
         $lines = [
             JournalLineData::debit($this->accounts->accountsReceivable()->id, $document->grand_total, Customer::class, $document->customer_id),
-            JournalLineData::credit($this->accounts->salesRevenue()->id, $document->grand_total),
         ];
+
+        if ($revenueTotal->isPositive()) {
+            $lines[] = JournalLineData::credit($this->accounts->salesRevenue()->id, $revenueTotal);
+        }
+
+        foreach ($document->items->where('line_type', 'gl_account')->groupBy('gl_account_id') as $glAccountId => $glItems) {
+            $groupTotal = $glItems->reduce(fn (Money $carry, InvoiceItem $item) => $carry->add($lineNetAmount($item)), Money::zero());
+
+            if ($groupTotal->isPositive()) {
+                $lines[] = JournalLineData::credit((int) $glAccountId, $groupTotal);
+            }
+        }
 
         if ($cogsTotal->isPositive()) {
             $lines[] = JournalLineData::debit($this->accounts->cogs()->id, $cogsTotal);

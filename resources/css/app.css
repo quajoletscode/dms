@@ -43,7 +43,7 @@
 
 @layer base {
     body {
-        @apply bg-body text-body text-[15px] md:text-base;
+        @apply bg-body text-[15px] text-body md:text-base;
     }
     *[data-scroll-lock='true'] {
         overflow: hidden;

@@ -42,16 +42,21 @@ const props = withDefaults(
     },
 );
 
-export type LineItemRow = { product_id: string | number } & Record<string, string | number>;
+export type LineItemRow = { product_id: string | number } & Record<
+    string,
+    string | number
+>;
 type Row = LineItemRow;
 
 const model = defineModel<Row[]>({ required: true });
 
 function blankRow(): Row {
     const row = { product_id: '' } as Row;
+
     for (const column of props.columns) {
         row[column.key] = '';
     }
+
     return row;
 }
 
@@ -63,11 +68,24 @@ function ensureMinimumRows() {
 
 ensureMinimumRows();
 
-const productOptions = computed(() => props.products.map((product) => ({ label: product.label, value: product.id })));
+const productOptions = computed(() =>
+    props.products.map((product) => ({
+        label: product.label,
+        value: product.id,
+    })),
+);
 
-const filledCount = computed(() => model.value.filter((row) => row.product_id !== '' && row.product_id !== null).length);
+const filledCount = computed(
+    () =>
+        model.value.filter(
+            (row) => row.product_id !== '' && row.product_id !== null,
+        ).length,
+);
 
-function onProductSelected(row: Row, productId: string | number | Record<string, unknown>) {
+function onProductSelected(
+    row: Row,
+    productId: string | number | Record<string, unknown>,
+) {
     if (typeof productId === 'object') {
         return;
     }
@@ -75,6 +93,7 @@ function onProductSelected(row: Row, productId: string | number | Record<string,
     row.product_id = productId;
 
     const product = props.products.find((p) => p.id === Number(productId));
+
     if (product?.defaults) {
         for (const [key, value] of Object.entries(product.defaults)) {
             if (row[key] === '' || row[key] === undefined) {
@@ -86,6 +105,7 @@ function onProductSelected(row: Row, productId: string | number | Record<string,
     // Grow the grid the moment someone fills the last row — the list never
     // visibly "runs out", so bulk entry never has to stop to add more rows.
     const isLastRow = model.value[model.value.length - 1] === row;
+
     if (isLastRow) {
         model.value.push(blankRow());
     }
@@ -111,13 +131,23 @@ watch(() => props.minRows, ensureMinimumRows);
 
 <template>
     <div class="space-y-3">
-        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+        <div
+            class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700"
+        >
             <table class="w-full border-collapse text-sm">
                 <thead class="bg-slate-50 dark:bg-slate-900/60">
-                    <tr class="text-left text-xs font-medium tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                    <tr
+                        class="text-left text-xs font-medium tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                    >
                         <th class="w-10 px-3 py-2">#</th>
                         <th class="min-w-64 px-3 py-2">Product</th>
-                        <th v-for="column in columns" :key="column.key" class="w-36 px-3 py-2">{{ column.label }}</th>
+                        <th
+                            v-for="column in columns"
+                            :key="column.key"
+                            class="w-36 px-3 py-2"
+                        >
+                            {{ column.label }}
+                        </th>
                         <th class="w-10 px-3 py-2" />
                     </tr>
                 </thead>
@@ -127,17 +157,27 @@ watch(() => props.minRows, ensureMinimumRows);
                         :key="index"
                         class="border-t border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40"
                     >
-                        <td class="px-3 py-2 align-top text-xs text-slate-400 tabular-nums">{{ index + 1 }}</td>
+                        <td
+                            class="px-3 py-2 align-top text-xs text-slate-400 tabular-nums"
+                        >
+                            {{ index + 1 }}
+                        </td>
                         <td class="px-3 py-2 align-top">
                             <SelectList
                                 :model-value="row.product_id"
-                                @update:model-value="(value) => onProductSelected(row, value)"
+                                @update:model-value="
+                                    (value) => onProductSelected(row, value)
+                                "
                                 :options="productOptions"
                                 placeholder="Select a product…"
                                 :error="errorFor(index, 'product_id')"
                             />
                         </td>
-                        <td v-for="column in columns" :key="column.key" class="px-3 py-2 align-top">
+                        <td
+                            v-for="column in columns"
+                            :key="column.key"
+                            class="px-3 py-2 align-top"
+                        >
                             <NumberInput
                                 v-if="column.type !== 'text'"
                                 v-model="row[column.key]"
@@ -148,7 +188,7 @@ watch(() => props.minRows, ensureMinimumRows);
                                 v-else
                                 v-model="row[column.key]"
                                 type="text"
-                                class="w-full rounded-md px-1.25 py-2 outline-[1.5px] hover:outline-primary-light focus:outline-primary-light dark:bg-inherit"
+                                class="hover:outline-primary-light focus:outline-primary-light w-full rounded-md px-1.25 py-2 outline-[1.5px] dark:bg-inherit"
                             />
                         </td>
                         <td class="px-3 py-2 text-right align-top">
@@ -167,11 +207,14 @@ watch(() => props.minRows, ensureMinimumRows);
         </div>
 
         <div class="flex items-center justify-between text-sm">
-            <p class="text-slate-500 dark:text-slate-400">{{ filledCount }} of {{ model.length }} rows filled — blank rows are ignored on submit.</p>
+            <p class="text-slate-500 dark:text-slate-400">
+                {{ filledCount }} of {{ model.length }} rows filled — blank rows
+                are ignored on submit.
+            </p>
             <div class="flex items-center gap-2">
                 <button
                     type="button"
-                    class="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-slate-600 transition-colors hover:border-primary-light hover:text-primary-light dark:border-slate-700 dark:text-slate-300"
+                    class="hover:border-primary-light hover:text-primary-light inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-slate-600 transition-colors dark:border-slate-700 dark:text-slate-300"
                     @click="addRows(1)"
                 >
                     <PlusIcon :size="14" />
@@ -179,7 +222,7 @@ watch(() => props.minRows, ensureMinimumRows);
                 </button>
                 <button
                     type="button"
-                    class="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-slate-600 transition-colors hover:border-primary-light hover:text-primary-light dark:border-slate-700 dark:text-slate-300"
+                    class="hover:border-primary-light hover:text-primary-light inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-slate-600 transition-colors dark:border-slate-700 dark:text-slate-300"
                     @click="addRows(bulkAddSize)"
                 >
                     <PlusIcon :size="14" />

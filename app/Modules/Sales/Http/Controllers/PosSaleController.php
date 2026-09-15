@@ -31,11 +31,12 @@ class PosSaleController extends Controller
 
         return Inertia::render('sales/pos/Create', [
             'tillSession' => $tillSession->only(['id', 'warehouse_id']),
-            'customers' => Customer::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'credit_limit'])
+            'customers' => Customer::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'credit_limit', 'driver_vehicle_profiles'])
                 ->map(fn (Customer $customer) => [
                     'id' => $customer->id,
                     'name' => $customer->name,
                     'credit_limit' => $customer->credit_limit->toMajor(),
+                    'driver_vehicle_profiles' => $customer->driver_vehicle_profiles ?? [],
                 ]),
             'products' => Product::query()->where('is_active', true)->orderBy('name')->get(['id', 'sku', 'name', 'retail_price', 'tax_rate'])
                 ->map(fn (Product $product) => [
@@ -64,6 +65,7 @@ class PosSaleController extends Controller
                 $request->validated('customer_id'),
                 $request->validated('items'),
                 $request->validated('payments') ?? [],
+                $request->validated('sale_date'),
             );
         } catch (TillSessionClosedException $e) {
             return to_route('till-sessions.create')->with('error', $e->getMessage());

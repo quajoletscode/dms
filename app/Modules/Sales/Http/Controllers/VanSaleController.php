@@ -41,11 +41,12 @@ class VanSaleController extends Controller
                         'dsr' => $van->dsr?->only(['id', 'name']),
                     ])
                 : [],
-            'customers' => Customer::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'credit_limit'])
+            'customers' => Customer::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'credit_limit', 'driver_vehicle_profiles'])
                 ->map(fn (Customer $customer) => [
                     'id' => $customer->id,
                     'name' => $customer->name,
                     'credit_limit' => $customer->credit_limit->toMajor(),
+                    'driver_vehicle_profiles' => $customer->driver_vehicle_profiles ?? [],
                 ]),
             'products' => Product::query()->where('is_active', true)->orderBy('name')->get(['id', 'sku', 'name', 'van_price', 'tax_rate'])
                 ->map(fn (Product $product) => [
@@ -79,6 +80,7 @@ class VanSaleController extends Controller
                 $request->validated('customer_id'),
                 $request->validated('items'),
                 $request->validated('payments') ?? [],
+                $request->validated('sale_date'),
             );
         } catch (CreditLimitExceededException $e) {
             return back()->withErrors(['customer_id' => $e->getMessage()])->withInput();

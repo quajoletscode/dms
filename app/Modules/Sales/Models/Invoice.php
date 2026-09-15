@@ -23,6 +23,8 @@ use Illuminate\Support\Carbon;
  * @property int|null $sales_order_id
  * @property int|null $proforma_invoice_id
  * @property Carbon|null $due_date
+ * @property Carbon|null $invoice_date
+ * @property Carbon|null $posting_date
  * @property string $status
  * @property Money $subtotal
  * @property Money $tax_total
@@ -45,6 +47,8 @@ class Invoice extends Model
     {
         return [
             'due_date' => 'date',
+            'invoice_date' => 'date',
+            'posting_date' => 'date',
             'subtotal' => MoneyCast::class,
             'tax_total' => MoneyCast::class,
             'discount_total' => MoneyCast::class,

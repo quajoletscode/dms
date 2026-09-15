@@ -32,20 +32,41 @@ const submit = () => {
         <form @submit.prevent="submit">
             <ObjectPageSection id="details" title="Details">
                 <div class="space-y-4">
-                    <TextInput label="Code" required v-model="form.code" :error="form.errors.code" :disabled="form.processing" />
-                    <TextInput label="Vehicle No." v-model="form.vehicle_no" :error="form.errors.vehicle_no" :disabled="form.processing" />
+                    <TextInput
+                        label="Code"
+                        required
+                        v-model="form.code"
+                        :error="form.errors.code"
+                        :disabled="form.processing"
+                    />
+                    <TextInput
+                        label="Vehicle No."
+                        v-model="form.vehicle_no"
+                        :error="form.errors.vehicle_no"
+                        :disabled="form.processing"
+                    />
                     <SelectList
                         label="Parent Warehouse"
                         required
                         v-model="form.warehouse_id"
-                        :options="props.warehouses.map((w) => ({ label: w.name, value: w.id }))"
+                        :options="
+                            props.warehouses.map((w) => ({
+                                label: w.name,
+                                value: w.id,
+                            }))
+                        "
                         :error="form.errors.warehouse_id"
                         :disabled="form.processing"
                     />
                     <SelectList
                         label="DSR"
                         v-model="form.dsr_user_id"
-                        :options="props.dsrs.map((d) => ({ label: d.name, value: d.id }))"
+                        :options="
+                            props.dsrs.map((d) => ({
+                                label: d.name,
+                                value: d.id,
+                            }))
+                        "
                         placeholder="Unassigned"
                         :error="form.errors.dsr_user_id"
                         :disabled="form.processing"
@@ -54,8 +75,16 @@ const submit = () => {
 
                 <template #footer>
                     <Link :href="index().url" class="button ghost">Cancel</Link>
-                    <Button type="submit" class="flex items-center gap-2" :disabled="form.processing">
-                        <Loader2Icon :size="18" class="animate-spin" v-if="form.processing" />
+                    <Button
+                        type="submit"
+                        class="flex items-center gap-2"
+                        :disabled="form.processing"
+                    >
+                        <Loader2Icon
+                            :size="18"
+                            class="animate-spin"
+                            v-if="form.processing"
+                        />
                         <SaveIcon :size="18" v-else />
                         Save
                     </Button>

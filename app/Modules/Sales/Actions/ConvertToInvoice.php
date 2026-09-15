@@ -98,6 +98,8 @@ final class ConvertToInvoice
                 );
             }
 
+            $today = now()->toDateString();
+
             $invoice = Invoice::query()->create([
                 'no' => $this->numbers->next('invoice', 'warehouse', $warehouseId),
                 'source' => $source,
@@ -106,6 +108,8 @@ final class ConvertToInvoice
                 'sales_order_id' => $salesOrderId,
                 'proforma_invoice_id' => $proformaInvoiceId,
                 'due_date' => $dueDate,
+                'invoice_date' => $today,
+                'posting_date' => $today,
                 'status' => 'unpaid',
                 'created_by' => Auth::id(),
                 'subtotal' => $computation['subtotal']->minorUnits,
@@ -116,7 +120,7 @@ final class ConvertToInvoice
 
             $this->lineComposer->persist($invoice, 'warehouse', $warehouseId, $computation['lines']);
 
-            $this->postingEngine->post('invoice.issued', $invoice->load('items'));
+            $this->postingEngine->post('invoice.issued', $invoice->load('items'), date: $today);
 
             return $invoice->refresh();
         });

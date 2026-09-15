@@ -14,34 +14,47 @@ use App\Modules\Warehouse\Http\Requests\StorePurchaseOrderRequest;
 use App\Modules\Warehouse\Models\PurchaseOrder;
 use App\Modules\Warehouse\Models\Warehouse;
 use App\Support\AdjacentRecordResolver;
+use App\Support\ListPageProps;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class PurchaseOrderController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request, ListPageProps $listPageProps): Response
     {
         Gate::authorize('viewAny', PurchaseOrder::class);
 
+        $sort = $listPageProps->resolveSort($request, ['no', 'status', 'grand_total', 'created_at'], 'created_at');
+        $direction = $listPageProps->resolveDirection($request, 'desc');
+        $search = $request->string('q')->toString();
+
+        $paginator = PurchaseOrder::query()
+            // A PO's warehouse is loaded without WarehouseScope: the policy already
+            // decides who may see this PO at all (po.create/po.approve), so a
+            // manager assigned to a *different* warehouse should still see the name
+            // here rather than a silently-null relation.
+            ->with(['supplier', 'warehouse' => fn ($query) => $query->withoutGlobalScope(WarehouseScope::class)])
+            ->when($search !== '', fn ($query) => $query->where(fn ($q) => $q
+                ->where('no', 'like', "%{$search}%")
+                ->orWhereHas('supplier', fn ($supplierQuery) => $supplierQuery->where('name', 'like', "%{$search}%"))))
+            ->orderBy($sort, $direction)
+            ->paginate($listPageProps->resolvePerPage($request))
+            ->withQueryString()
+            ->through(fn (PurchaseOrder $po) => [
+                'id' => $po->id,
+                'no' => $po->no,
+                'status' => $po->status,
+                'grand_total' => $po->grand_total->toMajor(),
+                'supplier' => $po->supplier->only(['id', 'name']),
+                'warehouse' => $po->warehouse->only(['id', 'name']),
+            ]);
+
         return Inertia::render('purchase-orders/Index', [
-            'purchaseOrders' => PurchaseOrder::query()
-                // A PO's warehouse is loaded without WarehouseScope: the policy already
-                // decides who may see this PO at all (po.create/po.approve), so a
-                // manager assigned to a *different* warehouse should still see the name
-                // here rather than a silently-null relation.
-                ->with(['supplier', 'warehouse' => fn ($query) => $query->withoutGlobalScope(WarehouseScope::class)])
-                ->latest()
-                ->get()
-                ->map(fn (PurchaseOrder $po) => [
-                    'id' => $po->id,
-                    'no' => $po->no,
-                    'status' => $po->status,
-                    'grand_total' => $po->grand_total->toMajor(),
-                    'supplier' => $po->supplier->only(['id', 'name']),
-                    'warehouse' => $po->warehouse->only(['id', 'name']),
-                ]),
+            'purchaseOrders' => $paginator->items(),
+            ...$listPageProps->build($paginator, $request),
         ]);
     }
 

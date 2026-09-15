@@ -7,10 +7,14 @@ export function usePermissions() {
     const userRole = computed(() => page.props.auth.role ?? '');
 
     const isSuperAdmin = computed(() => userRole.value === 'super_admin');
-    const isWarehouseManager = computed(() => userRole.value === 'warehouse_manager');
+    const isWarehouseManager = computed(
+        () => userRole.value === 'warehouse_manager',
+    );
     const isDsr = computed(() => userRole.value === 'dsr');
     const isAccountant = computed(() => userRole.value === 'accountant');
-    const isWholesaleCashier = computed(() => userRole.value === 'wholesale_cashier');
+    const isWholesaleCashier = computed(
+        () => userRole.value === 'wholesale_cashier',
+    );
 
     const permissions = computed(() => page.props.auth.permissions ?? []);
 
@@ -22,7 +26,10 @@ export function usePermissions() {
     }
 
     function canAny(...slugs: string[]): boolean {
-        return isSuperAdmin.value || slugs.some((slug) => permissions.value.includes(slug));
+        return (
+            isSuperAdmin.value ||
+            slugs.some((slug) => permissions.value.includes(slug))
+        );
     }
 
     return {

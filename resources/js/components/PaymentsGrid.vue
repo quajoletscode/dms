@@ -33,7 +33,10 @@ function removeRow(index: number) {
 
 <template>
     <div class="space-y-3">
-        <p v-if="model.length === 0" class="rounded-md border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <p
+            v-if="model.length === 0"
+            class="rounded-md border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400"
+        >
             No payments added — the sale will be recorded fully on credit.
         </p>
 
@@ -42,9 +45,22 @@ function removeRow(index: number) {
             :key="index"
             class="grid grid-cols-1 gap-3 rounded-lg border border-slate-100 p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-start sm:border-0 sm:p-0 dark:border-slate-800"
         >
-            <SelectList label="Method" v-model="row.method" :options="methodOptions" :error="errors?.[`payments.${index}.method`]" />
-            <NumberInput label="Amount" v-model="row.amount" :error="errors?.[`payments.${index}.amount`]" />
-            <TextInput label="Reference" v-model="row.reference" :error="errors?.[`payments.${index}.reference`]" />
+            <SelectList
+                label="Method"
+                v-model="row.method"
+                :options="methodOptions"
+                :error="errors?.[`payments.${index}.method`]"
+            />
+            <NumberInput
+                label="Amount"
+                v-model="row.amount"
+                :error="errors?.[`payments.${index}.amount`]"
+            />
+            <TextInput
+                label="Reference"
+                v-model="row.reference"
+                :error="errors?.[`payments.${index}.reference`]"
+            />
             <button
                 type="button"
                 class="mt-7 text-slate-300 transition-colors hover:text-red-500 sm:mt-7.5 dark:text-slate-600"
@@ -57,7 +73,7 @@ function removeRow(index: number) {
 
         <button
             type="button"
-            class="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-sm text-slate-600 transition-colors hover:border-primary-light hover:text-primary-light dark:border-slate-700 dark:text-slate-300"
+            class="hover:border-primary-light hover:text-primary-light inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-sm text-slate-600 transition-colors dark:border-slate-700 dark:text-slate-300"
             @click="addRow"
         >
             <PlusIcon :size="14" />

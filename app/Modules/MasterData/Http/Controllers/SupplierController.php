@@ -8,19 +8,34 @@ use App\Modules\MasterData\Http\Requests\StoreSupplierRequest;
 use App\Modules\MasterData\Http\Requests\UpdateSupplierRequest;
 use App\Modules\MasterData\Models\Supplier;
 use App\Support\AdjacentRecordResolver;
+use App\Support\ListPageProps;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class SupplierController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request, ListPageProps $listPageProps): Response
     {
         Gate::authorize('viewAny', Supplier::class);
 
+        $sort = $listPageProps->resolveSort($request, ['name', 'code', 'created_at'], 'name');
+        $direction = $listPageProps->resolveDirection($request);
+        $search = $request->string('q')->toString();
+
+        $paginator = Supplier::query()
+            ->when($search !== '', fn ($query) => $query->where(fn ($q) => $q
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('code', 'like', "%{$search}%")))
+            ->orderBy($sort, $direction)
+            ->paginate($listPageProps->resolvePerPage($request))
+            ->withQueryString();
+
         return Inertia::render('suppliers/Index', [
-            'suppliers' => Supplier::query()->orderBy('name')->get(),
+            'suppliers' => $paginator->items(),
+            ...$listPageProps->build($paginator, $request),
         ]);
     }
 

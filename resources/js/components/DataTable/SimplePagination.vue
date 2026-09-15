@@ -24,7 +24,10 @@ const props = withDefaults(
 const page = usePage();
 
 const getRequest = () =>
-    (page.props.request as Request | undefined) ?? { q: null, per_page: null };
+    (page.props.request as unknown as Request | undefined) ?? {
+        q: null,
+        per_page: null,
+    };
 
 const handlePerPageChange = (event: Event) => {
     const target = event.target as HTMLSelectElement;
@@ -49,7 +52,7 @@ const handlePerPageChange = (event: Event) => {
 <template>
     <div
         v-if="props.meta"
-        class="rounded-0 bg-slate-300 px-2 text-primary dark:bg-slate-800 dark:text-primary-light"
+        class="rounded-0 text-primary dark:text-primary-light bg-slate-300 px-2 dark:bg-slate-800"
     >
         <div
             class="flex flex-wrap items-center justify-between gap-3 print:hidden"

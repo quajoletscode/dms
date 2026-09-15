@@ -13,4 +13,9 @@ export type Auth = {
     user: User | null;
     role: string | null;
     permissions: string[];
+    company?: string | null;
+    station?: {
+        name: string;
+        code: string;
+    } | null;
 };

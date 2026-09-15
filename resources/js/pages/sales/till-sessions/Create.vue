@@ -33,7 +33,12 @@ const submit = () => {
                         label="Warehouse"
                         required
                         v-model="form.warehouse_id"
-                        :options="props.warehouses.map((w) => ({ label: w.name, value: w.id }))"
+                        :options="
+                            props.warehouses.map((w) => ({
+                                label: w.name,
+                                value: w.id,
+                            }))
+                        "
                         :error="form.errors.warehouse_id"
                         :disabled="form.processing"
                     />
@@ -48,8 +53,16 @@ const submit = () => {
 
                 <template #footer>
                     <Link :href="index().url" class="button ghost">Cancel</Link>
-                    <Button type="submit" class="flex items-center gap-2" :disabled="form.processing">
-                        <Loader2Icon :size="18" class="animate-spin" v-if="form.processing" />
+                    <Button
+                        type="submit"
+                        class="flex items-center gap-2"
+                        :disabled="form.processing"
+                    >
+                        <Loader2Icon
+                            :size="18"
+                            class="animate-spin"
+                            v-if="form.processing"
+                        />
                         <SaveIcon :size="18" v-else />
                         Open Session
                     </Button>

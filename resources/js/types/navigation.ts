@@ -48,38 +48,96 @@ export const roleMenus = {
     default: (): NavItem[] => [
         {
             group: 'overview',
-            items: [{ name: 'dashboard', to: dashboard().url, icon: LayoutGridIcon }],
+            items: [
+                {
+                    name: 'dashboard',
+                    to: dashboard().url,
+                    icon: LayoutGridIcon,
+                },
+            ],
         },
         {
             group: 'inventory',
             items: [
-                { name: 'warehouses', to: warehousesIndex().url, icon: WarehouseIcon, permission: 'warehouse.view' },
-                { name: 'vans', to: vansIndex().url, icon: TruckIcon, permission: 'van.view' },
-                { name: 'products', to: productsIndex().url, icon: PackageIcon, permission: 'product.view' },
+                {
+                    name: 'warehouses',
+                    to: warehousesIndex().url,
+                    icon: WarehouseIcon,
+                    permission: 'warehouse.view',
+                },
+                {
+                    name: 'vans',
+                    to: vansIndex().url,
+                    icon: TruckIcon,
+                    permission: 'van.view',
+                },
+                {
+                    name: 'products',
+                    to: productsIndex().url,
+                    icon: PackageIcon,
+                    permission: 'product.view',
+                },
             ],
         },
         {
             group: 'partners',
             items: [
-                { name: 'suppliers', to: suppliersIndex().url, icon: UsersIcon, permission: 'supplier.view' },
-                { name: 'customers', to: customersIndex().url, icon: UsersIcon, permission: 'customer.view' },
+                {
+                    name: 'suppliers',
+                    to: suppliersIndex().url,
+                    icon: UsersIcon,
+                    permission: 'supplier.view',
+                },
+                {
+                    name: 'customers',
+                    to: customersIndex().url,
+                    icon: UsersIcon,
+                    permission: 'customer.view',
+                },
             ],
         },
         {
             group: 'procurement',
-            items: [{ name: 'purchase orders', to: purchaseOrdersIndex().url, icon: ClipboardListIcon, permission: 'po.create' }],
+            items: [
+                {
+                    name: 'purchase orders',
+                    to: purchaseOrdersIndex().url,
+                    icon: ClipboardListIcon,
+                    permission: 'po.create',
+                },
+            ],
         },
         {
             group: 'sales',
             items: [
-                { name: 'till sessions', to: tillSessionsIndex().url, icon: WalletIcon, permission: 'sales.pos' },
-                { name: 'pos sale', to: posCreate().url, icon: ShoppingCartIcon, permission: 'sales.pos' },
-                { name: 'van sale', to: vanSaleCreate().url, icon: TruckIcon, permission: 'van.sale' },
+                {
+                    name: 'till sessions',
+                    to: tillSessionsIndex().url,
+                    icon: WalletIcon,
+                    permission: 'sales.pos',
+                },
+                {
+                    name: 'pos sale',
+                    to: posCreate().url,
+                    icon: ShoppingCartIcon,
+                    permission: 'sales.pos',
+                },
+                {
+                    name: 'van sale',
+                    to: vanSaleCreate().url,
+                    icon: TruckIcon,
+                    permission: 'van.sale',
+                },
                 {
                     name: 'invoices',
                     to: invoicesIndex().url,
                     icon: ReceiptIcon,
-                    permissions: ['invoice.create', 'invoice.payment.record', 'sales.pos', 'van.sale'],
+                    permissions: [
+                        'invoice.create',
+                        'invoice.payment.record',
+                        'sales.pos',
+                        'van.sale',
+                    ],
                 },
             ],
         },

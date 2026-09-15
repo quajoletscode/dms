@@ -11,19 +11,35 @@ use App\Modules\MasterData\Models\Category;
 use App\Modules\MasterData\Models\Product;
 use App\Modules\MasterData\Models\Unit;
 use App\Support\AdjacentRecordResolver;
+use App\Support\ListPageProps;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ProductController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request, ListPageProps $listPageProps): Response
     {
         Gate::authorize('viewAny', Product::class);
 
+        $sort = $listPageProps->resolveSort($request, ['name', 'sku', 'created_at'], 'name');
+        $direction = $listPageProps->resolveDirection($request);
+        $search = $request->string('q')->toString();
+
+        $paginator = Product::query()
+            ->with(['category', 'unit'])
+            ->when($search !== '', fn ($query) => $query->where(fn ($q) => $q
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('sku', 'like', "%{$search}%")))
+            ->orderBy($sort, $direction)
+            ->paginate($listPageProps->resolvePerPage($request))
+            ->withQueryString();
+
         return Inertia::render('products/Index', [
-            'products' => Product::query()->with(['category', 'unit'])->orderBy('name')->get(),
+            'products' => $paginator->items(),
+            ...$listPageProps->build($paginator, $request),
         ]);
     }
 

@@ -2,9 +2,20 @@ import { usePage } from '@inertiajs/vue3';
 // import { useEchoNotification } from '@laravel/echo-vue';
 import { ref, watch } from 'vue';
 // import { isBroadcastingConfigured } from '@/lib/broadcasting';
-import notificationRoutes from '@/routes/notifications';
 
 const POLL_INTERVAL_MS = 15_000;
+const notificationRoutes = {
+    index: {
+        url: () => '/notifications',
+    },
+    markAllRead: {
+        url: () => '/notifications/read-all',
+    },
+    read: {
+        url: (notification: string) =>
+            `/notifications/${encodeURIComponent(notification)}/read`,
+    },
+};
 
 export type NotificationPriority = 'critical' | 'important' | 'info';
 
@@ -38,8 +49,7 @@ interface SharedNotificationsPayload {
 
 function syncNotificationsFromSharedProps(page: ReturnType<typeof usePage>) {
     const sharedPayload = page.props.notifications as
-        | SharedNotificationsPayload
-        | undefined;
+        SharedNotificationsPayload | undefined;
 
     if (!sharedPayload) {
         return;
@@ -111,7 +121,6 @@ async function markAllAsRead() {
     unreadCount.value = 0;
 }
 
-
 export function useNotifications() {
     if (!initialized) {
         initialized = true;
@@ -162,8 +171,6 @@ export function useNotifications() {
         markAllAsRead,
     };
 }
-
-
 
 // function listenForRealtimeNotifications() {
 //     // Without a configured broadcaster key, instantiating the Echo connector

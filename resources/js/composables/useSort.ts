@@ -8,11 +8,14 @@ export function useSort(only?: string[]) {
     const page = usePage();
 
     const sort = computed<string | null>(
-        () => (page.props.request as Request | undefined)?.sort ?? null,
+        () =>
+            (page.props.request as unknown as Request | undefined)?.sort ??
+            null,
     );
 
     const direction = computed<SortDirection | null>(() => {
-        const dir = (page.props.request as Request | undefined)?.direction;
+        const dir = (page.props.request as unknown as Request | undefined)
+            ?.direction;
 
         return dir === 'asc' || dir === 'desc' ? dir : null;
     });
@@ -35,7 +38,8 @@ export function useSort(only?: string[]) {
         }
         // else descending -> clear sort (newSort and newDir remain undefined)
 
-        const request = (page.props.request as Request | undefined) ?? { q: null, per_page: null };
+        const request = (page.props.request as unknown as
+            Request | undefined) ?? { q: null, per_page: null };
 
         router.get(
             '',
