@@ -14,9 +14,14 @@ use Illuminate\Pagination\LengthAwarePaginator;
 final class ListPageProps
 {
     /**
+     * @param  array<string, mixed>  $extraRequestParams  Extra filter params (e.g. a status
+     *                                                    chip) a controller needs echoed back into `request` so
+     *                                                    they survive a page-size change or a sort click made via
+     *                                                    the shared pagination/sort composables, which rebuild
+     *                                                    their next request from this prop rather than the URL.
      * @return array{meta: array<string, mixed>, request: array<string, mixed>}
      */
-    public function build(LengthAwarePaginator $paginator, Request $request): array
+    public function build(LengthAwarePaginator $paginator, Request $request, array $extraRequestParams = []): array
     {
         return [
             'meta' => [
@@ -32,6 +37,7 @@ final class ListPageProps
                 'per_page' => $paginator->perPage(),
                 'sort' => $request->string('sort')->toString() ?: null,
                 'direction' => $request->string('direction')->toString() ?: null,
+                ...$extraRequestParams,
             ],
         ];
     }

@@ -144,17 +144,27 @@ onBeforeUnmount(() => {
 
                         <div
                             v-if="section.items.length"
-                            class="absolute left-0 top-full z-50 mt-2 hidden min-w-48 rounded-md border border-slate-200 bg-white p-1.5 shadow-lg group-hover:block"
+                            class="absolute left-0 top-full z-50 hidden pt-2 group-hover:block"
                         >
-                            <button
-                                v-for="item in section.items"
-                                :key="item.name"
-                                type="button"
-                                class="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
-                                @click="visit(item.to)"
-                            >
-                                <span>{{ item.displayName }}</span>
-                            </button>
+                            <!--
+                                The pt-2 above (not mt-2 on this div) keeps the
+                                gap between the button and the panel inside
+                                this element's own hoverable box. A margin
+                                here would leave that gap empty, so crossing
+                                it drops :hover for a frame and the panel
+                                closes before the pointer ever reaches it.
+                            -->
+                            <div class="min-w-48 rounded-md border border-slate-200 bg-white p-1.5 shadow-lg">
+                                <button
+                                    v-for="item in section.items"
+                                    :key="item.name"
+                                    type="button"
+                                    class="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+                                    @click="visit(item.to)"
+                                >
+                                    <span>{{ item.displayName }}</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
